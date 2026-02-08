@@ -1,8 +1,11 @@
+import os
+import tempfile
+
 from celery import shared_task
 
+from apps.process import CHOICES_FUNCTION_PROCESS
 
 from .models import FilesUploaded, AllowToLoadData
-from .utils import CHOICES_FUNCTION_PROCESS
 
 
 @shared_task(
@@ -26,10 +29,18 @@ def process_file(self, file_pk, _uploaded_by_id=None, _device_source=None):
 
     if not class_process_function:
         return f"No processing function found for source: {device_source}"
+
+    # Storage backends (e.g. S3) don't support .path; use a temp file so processors can open(path).
+    tmp_path = None
     try:
-        file_path = file_obj.source.path
+        with file_obj.source.open("rb") as src:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", suffix=".tmp", delete=False
+            ) as tmp:
+                tmp.write(src.read())
+                tmp_path = tmp.name
         new_added, updated, ignored = class_process_function(
-            file_path=file_path,
+            file_path=tmp_path,
             device_source=device_source,
             uploaded_by=file_obj.uploaded_by,
         )
@@ -39,3 +50,9 @@ def process_file(self, file_pk, _uploaded_by_id=None, _device_source=None):
         return f"File {file_pk} - {file_obj} processed successfully. Total of records in file {total}, Total new records {new_added}, Total updated found records {updated}, Total ignored {ignored}"
     except Exception as e:
         return f"Error while processing file {file_pk}: {str(e)}"
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass

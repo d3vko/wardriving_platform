@@ -8,11 +8,11 @@ from apps.core.models import BaseModel
 
 
 class Vendors(BaseModel):
-    # Ej: "MA-L" (24-bit), "MA-M" (28-bit), "MA-S" (36-bit), "IAB", etc.
+    # e.g. "MA-L" (24-bit), "MA-M" (28-bit), "MA-S" (36-bit), "IAB", etc.
     registry = models.CharField(max_length=8, db_index=True)
     # Prefix HEX: "F4BD9E"
     assignment = models.CharField(max_length=12, db_index=True)
-    # Lenght expressed in bits (24, 28, 36...). For e.x. MA-L - 24.
+    # Length expressed in bits (24, 28, 36...). e.g. MA-L -> 24.
     prefix_bits = models.PositiveSmallIntegerField(db_index=True)
     organization_name = models.CharField(max_length=255, db_index=True)
     organization_address = models.TextField(blank=True, default="")

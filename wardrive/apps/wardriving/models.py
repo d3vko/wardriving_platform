@@ -54,10 +54,10 @@ class Wardriving(WardriveBaseModel):
             try:
                 return Decimal(x) == 0
             except (InvalidOperation, TypeError):
-                # Si viene string raro, NaN, etc. trátalo como default
+                # Invalid/weird string, NaN, etc. treat as default
                 return True
 
-        # Default si no tenemos coordenadas reales
+        # Default when we have no real coordinates
         return is_zero_or_none(lat) and is_zero_or_none(lon)
 
 
@@ -85,8 +85,8 @@ class LTEWardriving(WardriveBaseModel):
 
     class Meta:
         db_table = "lte_wardriving"
-        verbose_name = " LTE Wardriving Found"
-        verbose_name_plural = " LTE Wardriving Founds"
+        verbose_name = "LTE Wardriving Found"
+        verbose_name_plural = "LTE Wardriving Founds"
 
     def __str__(self):
         return f"`{self.pk}`:{self.mcc}-{self.mnc}-{self.lac} : ({self.cell_id})"
@@ -102,14 +102,14 @@ class LTEWardriving(WardriveBaseModel):
             try:
                 return Decimal(x) == 0
             except (InvalidOperation, TypeError):
-                # Si viene string raro, NaN, etc. trátalo como default
+                # Invalid/weird string, NaN, etc. treat as default
                 return True
 
-        # Default si no tenemos coordenadas reales
+        # Default when we have no real coordinates
         return is_zero_or_none(lat) and is_zero_or_none(lon)
 
 
-## Impor all Views here
+## Import all Views here
 from .db_views import (
     WardrivingVendorsView,
 )

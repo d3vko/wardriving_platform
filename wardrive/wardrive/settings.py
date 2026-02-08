@@ -13,7 +13,10 @@ SECRET_KEY = env("SECRET_KEY")
 
 DEBUG = env("DEBUG", default=False, cast=bool)
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=["localhost", "127.0.0.1"],
+)
 
 
 INSTALLED_APPS = [
@@ -47,7 +50,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    # Cors configurados para admitir distintos destinos
+    # CORS configured to allow multiple origins
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     # Allow Locations and language support
@@ -110,14 +113,16 @@ USE_I18N = True
 
 USE_TZ = True
 
-FORCE_SCRIPT_NAME = env("FORCE_SCRIPT_NAME", default="")
+FORCE_SCRIPT_NAME = env("FORCE_SCRIPT_NAME", default="").rstrip("/")
+_script = f"{FORCE_SCRIPT_NAME}/" if FORCE_SCRIPT_NAME else ""
+
 # Static files (CSS, JavaScript, Images)
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATIC_URL = os.path.join(FORCE_SCRIPT_NAME, "static/")
+STATIC_URL = env("STATIC_URL", default=f"{_script}static/")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Media Config
-MEDIA_URL = os.path.join(FORCE_SCRIPT_NAME, "/media/")
+# Media: from env or default; when using S3, MEDIA_URL is typically /media/ (served by nginx proxy to MinIO)
+MEDIA_URL = env("MEDIA_URL", default=f"{_script}media/")
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -152,15 +157,55 @@ SIMPLE_JWT = {
 # CORS
 CORS_ALLOW_ALL_ORIGINS = env("CORS_ORIGIN_ALLOW_ALL", default=False, cast=bool)
 
-# Storages
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
+# Storage: S3/MinIO when USE_S3=true, else filesystem
+# Two buckets: one for wardrive (media), one for CTFd (ctfd)
+# Bucket names must be S3-valid: lowercase, numbers, hyphens only (no underscores)
+def _s3_bucket_name(name):
+    if not name:
+        return name
+    return str(name).lower().replace("_", "-").strip() or "media"
+
+USE_S3_STORAGE = env("USE_S3_STORAGE", default=False, cast=bool)
+AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = _s3_bucket_name(env("AWS_STORAGE_BUCKET_NAME", default="media"))
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="us-east-1")
+AWS_S3_FILE_OVERWRITE = env("AWS_S3_FILE_OVERWRITE", default=False, cast=bool)
+AWS_DEFAULT_ACL = env("AWS_DEFAULT_ACL", default="public-read")
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": env("AWS_S3_CACHE_CONTROL", default="max-age=86400"),
 }
+
+if USE_S3_STORAGE and AWS_S3_ENDPOINT_URL and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+        "default": {
+            "BACKEND": "wardrive.storage_backends.MinIOS3Storage",
+            "OPTIONS": {
+                "endpoint_url": AWS_S3_ENDPOINT_URL,
+                "access_key": AWS_ACCESS_KEY_ID,
+                "secret_key": AWS_SECRET_ACCESS_KEY,
+                "bucket_name": AWS_STORAGE_BUCKET_NAME,
+                "region_name": AWS_S3_REGION_NAME,
+                "file_overwrite": AWS_S3_FILE_OVERWRITE,
+                "default_acl": AWS_DEFAULT_ACL,
+                "object_parameters": AWS_S3_OBJECT_PARAMETERS,
+                "querystring_auth": env("AWS_S3_QUERYSTRING_AUTH", default=False, cast=bool),
+            },
+        },
+    }
+else:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+    }
 # Related to documentation
 SWAGGER_EMAIL = env("SWAGGER_EMAIL", default="example@mail.com")
 SWAGGER_AUTHOR = env("SWAGGER_AUTHOR", default="not specified")
@@ -175,7 +220,7 @@ SWAGGER_LICENSE = env("SWAGGER_LICENSE", default="Not specified yet")
 SWAGGER_SETTINGS = {
     "USE_SESSION_AUTH": env(
         "SWAGGER_USE_SESSION_AUTH", default=False, cast=bool
-    ),  # Desactiva la autenticación por sesión
+    ),  # Disable session authentication
     "SECURITY_DEFINITIONS": {
         "Bearer": {
             "type": "apiKey",
@@ -202,7 +247,7 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Mexico_City"
 CELERY_ENABLE_UTC = False
-# --- Sharding por (uploaded_by, device_source) ---
+# --- Sharding by (uploaded_by, device_source) ---
 CELERY_SHARDS = int(os.getenv("CELERY_SHARDS", "4"))
 CELERY_TASK_DEFAULT_QUEUE = "proc_0"
 QUEUE_ARGS = {"x-max-priority": 10}
@@ -229,7 +274,7 @@ def route_by_pair(name, args, kwargs, options, task=None, **_):
         ds = kwargs.get("_device_source")
         if ub is not None and ds is not None:
             q = _shard_for(ub, ds)
-            # prioridad ejemplo: fuentes críticas más alto (más cercano a 10)
+            # e.g. higher priority for critical sources (closer to 10)
             prio = 8 if ds in {"wardriving_app"} else 5
             return {"queue": q, "routing_key": q, "priority": prio}
     return None
@@ -241,13 +286,16 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True
 
 APPEND_SLASH = False
 USE_X_FORWARDED_HOST = True
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "http://*.ngrok.io",
-    "https://*.ngrok.io",
-    "http://*.ngrok-free.app",
-    "https://*.ngrok-free.app",
-    "http://*.tcp.ngrok.io",
-    "https://*.tcp.ngrok.io",
-]
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://*.ngrok.io",
+        "https://*.ngrok.io",
+        "http://*.ngrok-free.app",
+        "https://*.ngrok-free.app",
+        "http://*.tcp.ngrok.io",
+        "https://*.tcp.ngrok.io",
+    ],
+)
