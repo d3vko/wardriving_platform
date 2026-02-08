@@ -2,12 +2,33 @@ volumes:
   wardriving_postgres_db: {}
   redis_data: {}
   metabase_data: {}
+  minio_data: {}
   static_volume:
   media_volume:
   ctfd_logs:
   ctfd_uploads:
 
 services:
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: on-failure
+
   wardrive:
     build: .
     volumes:
@@ -28,7 +49,7 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - wardriving_postgres_db:/var/lib/postgresql/data:Z
-  redis: # Define the Redis service
+  redis:
     image: "redis:alpine"
     volumes:
       - redis_data:/data
@@ -36,7 +57,7 @@ services:
   rabbitmq:
     image: rabbitmq:3.13-management
     ports:
-      - "15672:15672" # UI
+      - "15672:15672"
     restart: on-failure
 
   ctfd_platform:
@@ -50,8 +71,15 @@ services:
       - REVERSE_PROXY=true
       - APPLICATION_ROOT=/ctf
       - DATABASE_URL=postgresql://postgres:postgres@wardrive_db:5432/ctfd
+      # MinIO/S3: second bucket (CTFd). Wardrive uses AWS_STORAGE_BUCKET_NAME.
+      - UPLOAD_PROVIDER=s3
+      - AWS_S3_BUCKET=${CTFD_S3_BUCKET:-ctfd}
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
     depends_on:
       - wardrive_db
+      - minio
     restart: on-failure
   celery_proc_0:
     build: .

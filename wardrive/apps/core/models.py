@@ -8,19 +8,19 @@ from apps.wardriving import SourceDevice
 
 class SoftQuerySet(QuerySet):
     def delete(self):
-        # Actualiza el estado de eliminacion logica
+        # Updates logical delete state
         return super(SoftQuerySet, self).update(deleted_at=now())
 
     def hard_delete(self):
-        # Elimina totalmente el objeto
+        # Permanently deletes the object
         return super(SoftQuerySet, self).delete()
 
     def alive(self):
-        # Filtra aquellos objetos activos
+        # Filters active (non-deleted) objects
         return self.filter(deleted_at__isnull=True)
 
     def dead(self):
-        # Filtra aquellos objetos eliminados logicamente
+        # Filters logically deleted objects
         return self.exclude(deleted_at__isnull=True)
 
 
@@ -64,17 +64,17 @@ class BaseModel(models.Model):
 
     def delete(self):
         self.can_delete()
-        # Permite hacer un delete logico en la BD
+        # Performs logical delete in DB
         self.deleted_at = now()
         self.save()
 
     def recover(self):
-        # Permite recuperar un objeto
+        # Restores the object (clears deleted_at)
         self.deleted_at = None
         self.save()
 
     def hard_delete(self):
-        # Hace una eliminacion directa
+        # Permanently deletes the record
         super().delete()
 
     def save(self, *args, **kwargs):

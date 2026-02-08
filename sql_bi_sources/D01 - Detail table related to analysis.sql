@@ -14,4 +14,5 @@ WHERE
 	AND {{bssid}}
 	AND {{auth_mode}}
 	AND {{vendor}}
+	AND {{signal_streng}}
 ORDER BY first_seen DESC

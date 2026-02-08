@@ -1,6 +1,5 @@
 import csv
 import io
-import re
 import sys
 from dataclasses import dataclass
 from typing import Iterable, Iterator, Optional, Tuple
@@ -9,6 +8,7 @@ import requests
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from apps.core.regex import BLANK_RE, HEX_LINE_RE
 from apps.vendors.models import Vendors
 
 IEEE_OUI_TXT = "https://standards-oui.ieee.org/oui/oui.txt"
@@ -18,14 +18,6 @@ UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
 )
-
-# Ej: "28-6F-B9   (hex)     Nokia Shanghai Bell Co., Ltd."
-HEX_LINE_RE = re.compile(
-    r"^\s*([0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){2})\s+\(hex\)\s+(.+?)\s*$"
-)
-
-# Para saber cuándo terminar un bloque (línea vacía)
-BLANK_RE = re.compile(r"^\s*$")
 
 
 @dataclass
@@ -54,7 +46,7 @@ def _normalize_assignment(hex_with_dashes: str) -> str:
 
 def parse_oui_txt(content: str) -> Iterator[ParsedOui]:
     """
-    Parser por bloques del formato clásico:
+    Block parser for the classic format:
       XX-XX-XX (hex)  Organization Name
           Address line 1
           Address line 2
@@ -82,7 +74,7 @@ def parse_oui_txt(content: str) -> Iterator[ParsedOui]:
     for line in lines:
         m = HEX_LINE_RE.match(line)
         if m:
-            # Si ya traíamos un bloque, lo cerramos
+            # If we were in a block, close it
             yield from flush()
 
             current_hex = m.group(1)
@@ -90,32 +82,32 @@ def parse_oui_txt(content: str) -> Iterator[ParsedOui]:
             addr_lines = []
             continue
 
-        # Si estamos dentro de un bloque, capturamos dirección hasta blank line
+        # Inside a block: capture address lines until blank line
         if current_hex and current_name:
             if BLANK_RE.match(line):
                 yield from flush()
             else:
-                # En oui.txt muchas líneas vienen con indent, lo respetamos
+                # oui.txt often has indented lines; preserve them
                 addr_lines.append(line.strip("\r"))
 
-    # último bloque
+    # Last block
     yield from flush()
 
 
 def parse_oui_csv(content: str) -> Iterator[ParsedOui]:
     """
-    Cabeceras oficiales:
+    Official headers:
       Registry,Assignment,Organization Name,Organization Address
     """
-    # El CSV puede traer comillas y comas en la dirección
+    # CSV may contain quotes and commas in the address field
     f = io.StringIO(content)
     reader = csv.DictReader(f)
-    # Validación suave de cabeceras
+    # Soft header validation
     required = {"Registry", "Assignment", "Organization Name", "Organization Address"}
     missing = required - set(reader.fieldnames or [])
     if missing:
         raise ValueError(
-            f"CSV: faltan columnas: {sorted(missing)}; headers={reader.fieldnames}"
+            f"CSV: missing columns: {sorted(missing)}; headers={reader.fieldnames}"
         )
 
     for row in reader:
@@ -124,7 +116,7 @@ def parse_oui_csv(content: str) -> Iterator[ParsedOui]:
         org = (row.get("Organization Name") or "").strip()
         addr = (row.get("Organization Address") or "").strip()
 
-        # Para este command nos enfocamos en MA-L (OUI 24-bit)
+        # This command focuses on MA-L (OUI 24-bit)
         if registry != "MA-L":
             continue
 
@@ -140,40 +132,39 @@ def parse_oui_csv(content: str) -> Iterator[ParsedOui]:
 
 
 def registry_to_prefix_bits(registry: str) -> int:
-    # Para este caso: MA-L (OUI 24-bit)
+    # For this case: MA-L (OUI 24-bit)
     if registry == "MA-L":
         return 24
-    # Si luego agregas otros registros:
-    # MA-M -> 28, MA-S -> 36, etc.
+    # If you add other registries later: MA-M -> 28, MA-S -> 36, etc.
     return 24
 
 
 class Command(BaseCommand):
     help = (
-        "Importa IEEE OUI (MA-L) desde oui.txt (fallback a oui.csv) a la tabla Vendors."
+        "Import IEEE OUI (MA-L) from oui.txt (fallback to oui.csv) into the Vendors table."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--url",
             default=IEEE_OUI_TXT,
-            help="URL origen (por defecto oui.txt de IEEE).",
+            help="Source URL (default: IEEE oui.txt).",
         )
         parser.add_argument(
             "--batch-size",
             type=int,
             default=5000,
-            help="Tamaño de lote para bulk_create.",
+            help="Batch size for bulk_create.",
         )
         parser.add_argument(
             "--use-csv",
             action="store_true",
-            help="Forzar uso del CSV (oui.csv) aunque el txt responda.",
+            help="Force use of CSV (oui.csv) even if txt responds.",
         )
         parser.add_argument(
             "--truncate",
             action="store_true",
-            help="Borra los registros MA-L antes de importar (cuidado).",
+            help="Delete MA-L records before importing (use with care).",
         )
 
     def handle(self, *args, **opts):
@@ -182,7 +173,7 @@ class Command(BaseCommand):
         use_csv = opts["use_csv"]
         truncate = opts["truncate"]
 
-        self.stdout.write(self.style.NOTICE(f"📥 Descargando: {url}"))
+        self.stdout.write(self.style.NOTICE(f"📥 Downloading: {url}"))
 
         parsed_iter: Iterable[ParsedOui]
 
@@ -196,11 +187,11 @@ class Command(BaseCommand):
         else:
             status, raw = _http_get(url)
 
-            # Bloqueo común: 418/403. Fallback automático a CSV.
+            # Common block: 418/403. Automatic fallback to CSV.
             if status in (403, 418) or status != 200:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"⚠️  TXT no disponible (status={status}). Fallback a CSV: {IEEE_OUI_CSV}"
+                        f"⚠️  TXT not available (status={status}). Fallback to CSV: {IEEE_OUI_CSV}"
                     )
                 )
                 status2, raw2 = _http_get(IEEE_OUI_CSV)
@@ -227,7 +218,7 @@ class Command(BaseCommand):
 
         @transaction.atomic
         def flush_batch(batch: list[Vendors]) -> int:
-            # ignore_conflicts=True evita reventar por UniqueConstraint
+            # ignore_conflicts=True avoids failing on UniqueConstraint
             Vendors.objects.bulk_create(
                 batch, ignore_conflicts=True, batch_size=len(batch)
             )
@@ -261,6 +252,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"🎉 Import terminado. intentos_insert={created_total} seen={seen_total} source={source_url}"
+                f"🎉 Import finished. insert_attempts={created_total} seen={seen_total} source={source_url}"
             )
         )

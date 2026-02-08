@@ -3,11 +3,11 @@ from rest_framework import pagination
 
 class CustomPagination(pagination.PageNumberPagination):
     """
-    Configuración de los parámetros nombres  valores paginación de los API-REST.
-    Se establecen los nombres de parámetros default y los nombres de los campos
-    *- search = text for search
-    *- page = required page
-    *- page_size = size page
+    REST API pagination parameter configuration.
+    Default and field names:
+    * search = text for search
+    * page = page number
+    * page_size = page size
     """
 
     page_size = 20

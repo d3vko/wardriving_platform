@@ -7,3 +7,6 @@ class FilesUploadedConfig(AppConfig):
 
     def ready(self):
         import apps.files.signals
+        from apps.files.storage import ensure_media_bucket
+
+        ensure_media_bucket()

@@ -6,6 +6,69 @@ and compete using wireless data gathered from various supported devices.
 
 ------------------------------------------------------------------------
 
+# 🏗️ Architecture
+
+```mermaid
+flowchart TB
+  subgraph "Client"
+    User[User / API client]
+  end
+
+  subgraph "Edge"
+    Nginx[nginx :8000]
+  end
+
+  subgraph "Applications"
+    Wardrive[Django Wardrive API]
+    CTFd[CTFd /ctf]
+    Metabase[Metabase BI]
+  end
+
+  subgraph "Data & Storage"
+    PG[(PostgreSQL)]
+    Redis[(Redis)]
+    MinIO[MinIO S3]
+  end
+
+  subgraph "Message Queue"
+    RabbitMQ[RabbitMQ]
+  end
+
+  subgraph "Workers"
+    Celery0[Celery proc_0]
+    Celery1[Celery proc_1]
+    Beat[Celery Beat]
+  end
+
+  User --> Nginx
+  Nginx --> Wardrive
+  Nginx --> CTFd
+  Nginx --> Metabase
+
+  Wardrive --> PG
+  Wardrive --> MinIO
+  Wardrive --> RabbitMQ
+  Wardrive --> Redis
+
+  CTFd --> PG
+  CTFd --> MinIO
+
+  Metabase --> PG
+
+  RabbitMQ --> Celery0
+  RabbitMQ --> Celery1
+  Beat --> RabbitMQ
+
+  Celery0 --> PG
+  Celery0 --> MinIO
+  Celery0 --> Redis
+  Celery1 --> PG
+  Celery1 --> MinIO
+  Celery1 --> Redis
+```
+
+------------------------------------------------------------------------
+
 # ⚖️📜 Disclaimer / Legal Notice
 
 This project was created **exclusively for educational purposes** and as
@@ -194,7 +257,7 @@ Edit the `AllowToLoadData` instance and disable it.
 
 ``` python
 from apps.files.models import AllowToLoadData
-AllowToLoadData.objects.all().update(active=False)
+AllowToLoadData.objects.get_or_create(active=True)
 ```
 
 This prevents any new files from being processed.
