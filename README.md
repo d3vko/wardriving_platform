@@ -280,9 +280,10 @@ This prevents any new files from being processed.
 # 📌 TODO
 
 -   🏆 Add automatic Metabase setup (scoreboard)
--   🧪 Fix Swagger output issues
 -   🐾 Full support for Minino
 -   🕹️ Add new conquest mechanics
+-   🔐 Add auth or API key for file upload in production
+-   ✏️ Rename `is_procesed` → `is_processed` (migration)
 
 ------------------------------------------------------------------------
 
