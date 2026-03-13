@@ -239,17 +239,37 @@ SWAGGER_SETTINGS = {
 }
 
 # Redis Configuration
-REDIS_HOST = env("REDIS_HOST", default="localhost")
-REDIS_PORT = env("REDIS_PORT", default=6379, cast=int)
-REDIS_DB = env("REDIS_DB", default=0, cast=int)
+# Prefer full REDIS_URL from env (e.g. Railway: redis://default:PASSWORD@host:port/0)
+REDIS_URL = env("REDIS_URL", default="")
+if not REDIS_URL.strip():
+    REDIS_HOST = env("REDIS_HOST", default="localhost")
+    REDIS_PORT = env("REDIS_PORT", default=6379, cast=int)
+    REDIS_DB = env("REDIS_DB", default=0, cast=int)
+    REDIS_PASSWORD = env("REDIS_PASSWORD", default="")
+    if REDIS_HOST and REDIS_PORT:
+        if REDIS_PASSWORD:
+            REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+        else:
+            REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
-REDIS_URL = ""
-if REDIS_HOST and REDIS_PORT:
-    REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
-# Celery Configuration
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
+def _redis_url_with_db(url: str, db: int) -> str:
+    """Return the same Redis URL with the given database number (path)."""
+    if not url or not url.strip():
+        return ""
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(url)
+    # path is like /0 or /1; replace with /db
+    new_path = f"/{db}"
+    return urlunparse(parsed._replace(path=new_path))
+
+
+# Celery: use REDIS_URL with db 0/1 when broker/result URLs are not set (e.g. Railway single REDIS_URL)
+_default_broker = _redis_url_with_db(REDIS_URL, 0) or "redis://localhost:6379/0"
+_default_result = _redis_url_with_db(REDIS_URL, 1) or "redis://localhost:6379/1"
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=_default_broker)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=_default_result)
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
