@@ -118,7 +118,8 @@ _script = f"{FORCE_SCRIPT_NAME}/" if FORCE_SCRIPT_NAME else ""
 
 # Static files (CSS, JavaScript, Images)
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATIC_URL = env("STATIC_URL", default=f"{_script}static/")
+# Ruta custom para no chocar con MinIO Console (que usa /static/ y /styles/)
+STATIC_URL = env("STATIC_URL", default=f"{_script}static-wardrive/")
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media: from env or default; when using S3, MEDIA_URL is typically /media/ (served by nginx proxy to MinIO)
@@ -178,23 +179,30 @@ AWS_S3_OBJECT_PARAMETERS = {
 }
 
 if USE_S3_STORAGE and AWS_S3_ENDPOINT_URL and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+    _s3_options = {
+        "endpoint_url": AWS_S3_ENDPOINT_URL,
+        "access_key": AWS_ACCESS_KEY_ID,
+        "secret_key": AWS_SECRET_ACCESS_KEY,
+        "bucket_name": AWS_STORAGE_BUCKET_NAME,
+        "region_name": AWS_S3_REGION_NAME,
+        "file_overwrite": AWS_S3_FILE_OVERWRITE,
+        "default_acl": AWS_DEFAULT_ACL,
+        "object_parameters": AWS_S3_OBJECT_PARAMETERS,
+        "querystring_auth": env("AWS_S3_QUERYSTRING_AUTH", default=False, cast=bool),
+    }
+    # Static y media en MinIO (bucket wardrive-storage; static bajo prefijo "static/")
+    # MinIOStaticStorage genera URLs con STATIC_URL para que el navegador pida a nginx, no a minio:9000
     STORAGES = {
         "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+            "BACKEND": "wardrive.storage_backends.MinIOStaticStorage",
+            "OPTIONS": {
+                **_s3_options,
+                "location": "static",
+            },
         },
         "default": {
             "BACKEND": "wardrive.storage_backends.MinIOS3Storage",
-            "OPTIONS": {
-                "endpoint_url": AWS_S3_ENDPOINT_URL,
-                "access_key": AWS_ACCESS_KEY_ID,
-                "secret_key": AWS_SECRET_ACCESS_KEY,
-                "bucket_name": AWS_STORAGE_BUCKET_NAME,
-                "region_name": AWS_S3_REGION_NAME,
-                "file_overwrite": AWS_S3_FILE_OVERWRITE,
-                "default_acl": AWS_DEFAULT_ACL,
-                "object_parameters": AWS_S3_OBJECT_PARAMETERS,
-                "querystring_auth": env("AWS_S3_QUERYSTRING_AUTH", default=False, cast=bool),
-            },
+            "OPTIONS": _s3_options,
         },
     }
 else:

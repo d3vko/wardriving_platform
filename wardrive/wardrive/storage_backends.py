@@ -4,6 +4,7 @@ HeadObject 400 (treat as "not exists") so uploads can complete.
 """
 import re
 
+from django.conf import settings
 from botocore.exceptions import ClientError
 from storages.backends.s3 import S3Storage
 
@@ -38,3 +39,21 @@ class MinIOS3Storage(S3Storage):
             if code in ("400", "BadRequest"):
                 return False
             raise
+
+
+class MinIOStaticStorage(MinIOS3Storage):
+    """
+    MinIO storage for staticfiles that returns URLs under STATIC_URL (e.g. /static-wardrive/...)
+    so the browser requests our nginx, which proxies to MinIO. Evita que el navegador pida
+    http://minio:9000/... (host interno inaccesible).
+    """
+
+    def url(self, name):
+        # name es la key en S3, ej. "static/admin/css/base.css"
+        prefix = (self.location or "").strip("/")
+        if prefix and name.startswith(prefix + "/"):
+            subpath = name[len(prefix) :].lstrip("/")
+        else:
+            subpath = name
+        base = getattr(settings, "STATIC_URL", "/static/")
+        return (base.rstrip("/") + "/") + subpath

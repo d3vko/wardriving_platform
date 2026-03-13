@@ -3,8 +3,7 @@ from django.utils.timezone import now
 
 from decimal import Decimal, InvalidOperation
 
-from . import SourceDevice
-from apps.core.models import WardriveBaseModel
+from apps.core.models import WardriveBaseModel, SourceDevice
 
 
 class Wardriving(WardriveBaseModel):

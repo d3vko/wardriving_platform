@@ -2,6 +2,7 @@
 S3/MinIO client singleton for use across the project.
 Only instantiated when USE_S3_STORAGE is True and credentials are set.
 """
+import json
 import logging
 from typing import Any, Optional
 
@@ -81,11 +82,38 @@ def _ensure_bucket(client: Any, bucket: str, region: str) -> None:
         logger.warning("S3 create_bucket %s failed: %s", bucket, e)
 
 
+def _set_wardrive_bucket_public_read(client: Any, bucket: str) -> None:
+    """Allow public GetObject on wardrive bucket so nginx can proxy static/media without auth."""
+    from botocore.exceptions import ClientError
+
+    policy = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": [f"arn:aws:s3:::{bucket}/*"],
+            }
+        ],
+    }
+    try:
+        client.put_bucket_policy(Bucket=bucket, Policy=json.dumps(policy))
+        logger.info("Set public read policy on bucket %s (static/media)", bucket)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
+        if code in ("InvalidBucketName", "NoSuchBucket", "AccessDenied"):
+            logger.warning("Could not set bucket policy on %s: %s", bucket, e)
+        else:
+            logger.warning("put_bucket_policy %s failed: %s", bucket, e)
+
+
 def ensure_media_bucket() -> None:
     """
     Create the two S3/MinIO buckets if they do not exist:
     - Wardrive bucket (AWS_STORAGE_BUCKET_NAME): uploads from wardrive container.
     - CTFd bucket (CTFD_S3_BUCKET): uploads from CTFd container.
+    Apply public read policy on wardrive bucket so nginx can serve static/media from MinIO (evita 403).
     Call at startup when USE_S3_STORAGE is True.
     """
     client = get_s3_client()
@@ -101,5 +129,6 @@ def ensure_media_bucket() -> None:
     try:
         _ensure_bucket(client, wardrive_bucket, region)
         _ensure_bucket(client, ctfd_bucket, region)
+        _set_wardrive_bucket_public_read(client, wardrive_bucket)
     except Exception as e:
         logger.warning("Could not ensure wardrive/ctfd buckets: %s", e)
