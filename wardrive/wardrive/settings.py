@@ -240,6 +240,7 @@ SWAGGER_SETTINGS = {
 
 # Redis Configuration
 # Prefer full REDIS_URL from env (e.g. Railway: redis://default:PASSWORD@host:port/0)
+REDIS_USERNAME = env("REDIS_USERNAME", default="default")
 REDIS_URL = env("REDIS_URL", default="")
 if not REDIS_URL.strip():
     REDIS_HOST = env("REDIS_HOST", default="localhost")
@@ -251,7 +252,7 @@ if not REDIS_URL.strip():
             REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
         else:
             REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
-# Redis 6+ ACL (e.g. Railway) requires username "default"; normalize redis://:password@host -> redis://default:password@host
+# Redis 6+ ACL (e.g. Railway) requires a username; normalize redis://:password@host -> redis://USERNAME:password@host
 if REDIS_URL.strip():
     from urllib.parse import urlparse, urlunparse, quote
 
@@ -259,28 +260,29 @@ if REDIS_URL.strip():
     if _parsed.netloc.startswith(":"):
         _pwd = _parsed.netloc[1:].split("@")[0]
         _host = _parsed.netloc.split("@")[-1]
+        _user = quote(REDIS_USERNAME, safe="")
         REDIS_URL = urlunparse(
-            _parsed._replace(netloc=f"default:{quote(_pwd, safe='')}@{_host}")
+            _parsed._replace(netloc=f"{_user}:{quote(_pwd, safe='')}@{_host}")
         )
 
 
-def _redis_url_with_db(url: str, db: int) -> str:
+def _redis_url_with_db(url: str, db: int, username: str = None) -> str:
     """Return the same Redis URL with the given database number (path)."""
     if not url or not url.strip():
         return ""
     from urllib.parse import urlparse, urlunparse, quote
 
+    if username is None:
+        username = REDIS_USERNAME
     parsed = urlparse(url)
     # path is like /0 or /1; replace with /db
     new_path = f"/{db}"
-    # Redis 6+ ACL (e.g. Railway) often requires username "default"; redis://:password@host
-    # may fail with "Authentication required" — use default user if missing.
+    # Redis 6+ ACL (e.g. Railway) requires username; redis://:password@host -> username:password@host
     netloc = parsed.netloc
     if netloc.startswith(":"):
-        # no username, only password: use default:password so Redis gets AUTH default <password>
         password = netloc[1:].split("@")[0]
         host_part = netloc.split("@")[-1]
-        netloc = f"default:{quote(password, safe='')}@{host_part}"
+        netloc = f"{quote(username, safe='')}:{quote(password, safe='')}@{host_part}"
     return urlunparse(parsed._replace(netloc=netloc, path=new_path))
 
 
