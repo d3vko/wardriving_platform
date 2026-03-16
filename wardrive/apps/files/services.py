@@ -21,6 +21,7 @@ def run_process_file(file_upload_id: int = None, instance: FilesUploaded = None)
                     "_uploaded_by_id": uploaded_by_id,
                     "_device_source": device_source,
                 },
+                ignore_result=True,
             )
 
         transaction.on_commit(_enqueue)
