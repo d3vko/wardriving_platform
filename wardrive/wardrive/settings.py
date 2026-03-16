@@ -269,7 +269,25 @@ def _redis_url_with_db(url: str, db: int) -> str:
 _default_broker = _redis_url_with_db(REDIS_URL, 0) or "redis://localhost:6379/0"
 _default_result = _redis_url_with_db(REDIS_URL, 1) or "redis://localhost:6379/1"
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=_default_broker)
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=_default_result)
+_result_backend_from_env = env("CELERY_RESULT_BACKEND", default=_default_result)
+# If REDIS_URL has credentials but CELERY_RESULT_BACKEND is redis without auth (e.g. Railway),
+# use REDIS_URL with same DB so Redis auth succeeds.
+if (
+    REDIS_URL.strip()
+    and "@" in REDIS_URL
+    and _result_backend_from_env.strip().lower().startswith("redis://")
+    and "@" not in _result_backend_from_env
+):
+    from urllib.parse import urlparse
+
+    parsed = urlparse(_result_backend_from_env)
+    try:
+        _result_db = int((parsed.path or "/1").strip("/") or "1")
+    except ValueError:
+        _result_db = 1
+    CELERY_RESULT_BACKEND = _redis_url_with_db(REDIS_URL, _result_db)
+else:
+    CELERY_RESULT_BACKEND = _result_backend_from_env
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
