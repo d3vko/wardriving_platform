@@ -11,3 +11,6 @@ staticfiles/
 *json
 *.pcap
 *.kml
+
+.env.railway
+*.sql
