@@ -251,18 +251,37 @@ if not REDIS_URL.strip():
             REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
         else:
             REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+# Redis 6+ ACL (e.g. Railway) requires username "default"; normalize redis://:password@host -> redis://default:password@host
+if REDIS_URL.strip():
+    from urllib.parse import urlparse, urlunparse, quote
+
+    _parsed = urlparse(REDIS_URL)
+    if _parsed.netloc.startswith(":"):
+        _pwd = _parsed.netloc[1:].split("@")[0]
+        _host = _parsed.netloc.split("@")[-1]
+        REDIS_URL = urlunparse(
+            _parsed._replace(netloc=f"default:{quote(_pwd, safe='')}@{_host}")
+        )
 
 
 def _redis_url_with_db(url: str, db: int) -> str:
     """Return the same Redis URL with the given database number (path)."""
     if not url or not url.strip():
         return ""
-    from urllib.parse import urlparse, urlunparse
+    from urllib.parse import urlparse, urlunparse, quote
 
     parsed = urlparse(url)
     # path is like /0 or /1; replace with /db
     new_path = f"/{db}"
-    return urlunparse(parsed._replace(path=new_path))
+    # Redis 6+ ACL (e.g. Railway) often requires username "default"; redis://:password@host
+    # may fail with "Authentication required" — use default user if missing.
+    netloc = parsed.netloc
+    if netloc.startswith(":"):
+        # no username, only password: use default:password so Redis gets AUTH default <password>
+        password = netloc[1:].split("@")[0]
+        host_part = netloc.split("@")[-1]
+        netloc = f"default:{quote(password, safe='')}@{host_part}"
+    return urlunparse(parsed._replace(netloc=netloc, path=new_path))
 
 
 # Celery: use REDIS_URL with db 0/1 when broker/result URLs are not set (e.g. Railway single REDIS_URL)
