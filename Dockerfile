@@ -1,20 +1,23 @@
-FROM python:3.13
+FROM python:3.13-slim AS builder
 
-
-RUN mkdir /code
 WORKDIR /code
 
-# Installing apps
-RUN apt-get update && apt-get install -y postgresql netcat-traditional gettext
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all sources for deploy code and that stuff
+FROM python:3.13-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gettext netcat-traditional \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+WORKDIR /code
 COPY . .
 
-RUN sed -i 's/\r$//g' start.sh
-RUN sed -i 's/\r$//g' wait.sh
-RUN sed -i 's/\r$//g' start_celery.sh
-RUN sed -i 's/\r$//g' start_celery_beat.sh
-RUN chmod +x /code/start.sh /code/wait.sh /code/start_celery.sh /code/start_celery_beat.sh
+RUN sed -i 's/\r$//g' start.sh wait.sh start_celery.sh start_celery_beat.sh \
+    && chmod +x start.sh wait.sh start_celery.sh start_celery_beat.sh
 
-# Install Py dependencies
-RUN pip install -r /code/requirements.txt
+CMD ["/code/start.sh"]

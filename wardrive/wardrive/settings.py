@@ -138,7 +138,9 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": [],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
     # https://www.django-rest-framework.org/api-guide/exceptions/#custom-exception-handling
     # "EXCEPTION_HANDLER": "rest.exception_handler.custom_exception_handler",
     "DEFAULT_PARSER_CLASSES": [

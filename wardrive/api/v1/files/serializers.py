@@ -26,12 +26,11 @@ class MultipleFileUploadedCreateSerializer(serializers.Serializer):
         write_only=True,
     )
     device_source = serializers.ChoiceField(choices=SourceDevice.CHOICES)
-    uploaded_by = serializers.CharField(required=False, allow_blank=True, default="")
 
     def create(self, validated_data):
         files = validated_data.pop("files")
         device_source = validated_data.get("device_source")
-        uploaded_by = validated_data.get("uploaded_by", "")
+        uploaded_by = self.context["request"].user.username
 
         instances = []
         for f in files:

@@ -1,3 +1,18 @@
+x-celery-worker: &celery-worker
+  image: wardrive-app
+  command: /code/start_celery.sh
+  volumes:
+    - .:/code
+  depends_on:
+    wardrive:
+      condition: service_started
+    redis:
+      condition: service_started
+    rabbitmq:
+      condition: service_started
+  env_file: .env
+  restart: on-failure
+
 volumes:
   wardriving_postgres_db: {}
   redis_data: {}
@@ -28,8 +43,33 @@ services:
       start_period: 5s
     restart: on-failure
 
+  wardrive_db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - wardriving_postgres_db:/var/lib/postgresql/data:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: on-failure
+
+  redis:
+    image: "redis:alpine"
+    volumes:
+      - redis_data:/data
+    restart: on-failure
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: on-failure
+
   wardrive:
     build: .
+    image: wardrive-app
     volumes:
       - .:/code
       - static_volume:/code/staticfiles
@@ -37,24 +77,33 @@ services:
     command: /code/start.sh
     env_file: .env
     depends_on:
-      - wardrive_db
+      wardrive_db:
+        condition: service_healthy
     stdin_open: true
     tty: true
     restart: on-failure
-  wardrive_db:
-    restart: on-failure
-    image: postgres:17
+
+  celery_proc_0:
+    <<: *celery-worker
     environment:
-      POSTGRES_PASSWORD: postgres
+      - QUEUE=proc_0
+
+  celery_proc_1:
+    <<: *celery-worker
+    environment:
+      - QUEUE=proc_1
+
+  celery-beat:
+    image: wardrive-app
+    command: /code/start_celery_beat.sh
     volumes:
-      - wardriving_postgres_db:/var/lib/postgresql/data:Z
-  redis:
-    image: "redis:alpine"
-    volumes:
-      - redis_data:/data
-    restart: on-failure
-  rabbitmq:
-    image: rabbitmq:3.13-management
+      - .:/code
+    depends_on:
+      wardrive:
+        condition: service_started
+      redis:
+        condition: service_started
+    env_file: .env
     restart: on-failure
 
   ctfd_platform:
@@ -75,57 +124,24 @@ services:
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
       - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
     depends_on:
-      - wardrive_db
-      - minio
-    restart: on-failure
-  celery_proc_0:
-    build: .
-    command: /code/start_celery.sh
-    environment:
-      - QUEUE=proc_0
-    volumes:
-      - .:/code
-    depends_on:
-      - wardrive
-      - redis
-      - rabbitmq
-    env_file: .env
+      wardrive_db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: on-failure
 
-  celery_proc_1:
-    build: .
-    command: /code/start_celery.sh
-    environment:
-      - QUEUE=proc_1
-    volumes:
-      - .:/code
-    depends_on:
-      - wardrive
-      - redis
-      - rabbitmq
-    env_file: .env
-    restart: on-failure
-
-  celery-beat:
-    build: .
-    command: /code/start_celery_beat.sh
-    volumes:
-      - .:/code
-    depends_on:
-      - wardrive
-      - redis
-    env_file: .env
-    restart: on-failure
   wardrive_bi:
     image: metabase/metabase:v0.58.6
     env_file: .env
     volumes:
       - metabase_data:/metabase-data
     healthcheck:
-      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      test: ["CMD", "curl", "--fail", "-I", "http://localhost:3000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 30s
+
   wardrive_proxy:
     image: nginx:1.28.0
     depends_on:

@@ -41,13 +41,6 @@ upload_params = [
         description="Source device. Use GET /api/v1/device-sources/ for allowed values.",
         enum=DEVICE_SOURCE_VALUES,
     ),
-    openapi.Parameter(
-        name="uploaded_by",
-        in_=openapi.IN_FORM,
-        type=openapi.TYPE_STRING,
-        required=False,
-        description="Uploader identifier",
-    ),
 ]
 
 
@@ -56,7 +49,7 @@ class FilesUploadedViewSet(viewsets.ModelViewSet):
     lookup_field = "pk"
     queryset = FilesUploaded.objects.all()
     permission_classes = [
-        permissions.AllowAny,
+        permissions.IsAuthenticated,
     ]
     actions_serializers = {
         "list": FileUploadedListSerializer,
