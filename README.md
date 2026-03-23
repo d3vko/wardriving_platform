@@ -196,6 +196,28 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 FORCE_SCRIPT_NAME=/wardriving
 ```
 
+Frontend event branding and texts can be configured with `frontend/.env`:
+
+```bash
+VITE_APP_TITLE=Wardriving CTF
+VITE_APP_FAVICON_URL=https://example.com/assets/favicon.ico
+VITE_EVENT_HOME_TITLE=Platform Home
+VITE_EVENT_HOME_BADGE=Event
+VITE_EVENT_INTRO_TEXT=Welcome to the platform for our wardriving CTF event.\nHere you can upload captures, review analytics, explore maps, and export KML files.
+VITE_EVENT_DYNAMICS_TITLE=Event Dynamics
+VITE_EVENT_DYNAMICS_TEXT=1) Collect samples with supported devices.\n2) Upload your files in the Upload section.\n3) Review findings in Maps and Analytics.\n4) Export KML from KML Downloads.
+VITE_EVENT_LOGO_SECTION_TITLE=Event Branding
+VITE_EVENT_LOGO_SECTION_TEXT=Use this area to display your logo and official links.\nThis content is fully configurable by environment variables.
+VITE_EVENT_LOGO_URL=https://example.com/assets/event-logo.png
+VITE_EVENT_LOGO_ALT=Wardriving CTF logo
+VITE_EVENT_LOGO_LINK_URL=https://example.com/ctf
+VITE_EVENT_LOGO_LINK_LABEL=Open Event Website
+```
+
+Notes:
+- Use `\n` in env values to render line breaks in the Home page dynamics text.
+- `VITE_APP_TITLE` and `VITE_APP_FAVICON_URL` are applied at runtime in the frontend.
+
 Start the services:
 
 ``` bash

@@ -1,45 +1,15 @@
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
-  Grid,
   Stack,
   Typography,
 } from '@mui/material'
-import {
-  WifiFind as WifiFindIcon,
-  Router as RouterIcon,
-  Security as SecurityIcon,
-  Speed as SpeedIcon,
-} from '@mui/icons-material'
+import { WifiFind as WifiFindIcon } from '@mui/icons-material'
 
-const statCards = [
-  {
-    label: 'Networks Detected',
-    value: '—',
-    icon: <WifiFindIcon fontSize="large" />,
-    color: 'primary.main',
-  },
-  {
-    label: 'Access Points',
-    value: '—',
-    icon: <RouterIcon fontSize="large" />,
-    color: 'success.main',
-  },
-  {
-    label: 'Encrypted',
-    value: '—',
-    icon: <SecurityIcon fontSize="large" />,
-    color: 'warning.main',
-  },
-  {
-    label: 'Scan Speed',
-    value: '—',
-    icon: <SpeedIcon fontSize="large" />,
-    color: 'info.main',
-  },
-]
+import { appConfig } from '@/config/eventConfig'
 
 export default function Home() {
   return (
@@ -47,50 +17,80 @@ export default function Home() {
       <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
         <WifiFindIcon color="primary" sx={{ fontSize: 32 }} />
         <Typography variant="h4" fontWeight={700}>
-          Inicio
+          {appConfig.homeTitle}
         </Typography>
-        <Chip label="Evento" color="primary" size="small" />
+        <Chip label={appConfig.homeBadge} color="primary" size="small" />
       </Stack>
       <Typography variant="body1" color="text.secondary" mb={4}>
-        Bienvenido a la plataforma del evento de Wardriving. Aqui podras cargar capturas, revisar
-        analiticas, explorar mapas WiFi/LTE y descargar tus resultados en KML.
+        {appConfig.introText}
       </Typography>
 
-      <Grid container spacing={3}>
-        {statCards.map(({ label, value, icon, color }) => (
-          <Grid key={label} item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                  <Box>
-                    <Typography variant="h3" fontWeight={700}>
-                      {value}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" mt={0.5}>
-                      {label}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ color }}>{icon}</Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      <Box mt={4}>
+      <Stack spacing={3}>
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} mb={2}>
-              Dinamica del evento
+              {appConfig.dynamicsTitle}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              1) Recolecta muestras con dispositivos soportados. 2) Sube los archivos en la seccion
-              Upload. 3) Revisa tus hallazgos en mapa y analytics. 4) Exporta KML desde Descargas KML.
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+              {appConfig.dynamicsText}
             </Typography>
           </CardContent>
         </Card>
-      </Box>
+
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} mb={1}>
+              {appConfig.logoCardTitle}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mb={2} sx={{ whiteSpace: 'pre-line' }}>
+              {appConfig.logoCardText}
+            </Typography>
+
+            {appConfig.logoUrl ? (
+              <Box
+                component="img"
+                src={appConfig.logoUrl}
+                alt={appConfig.logoAlt}
+                sx={{
+                  maxWidth: { xs: '100%', sm: 360 },
+                  width: '100%',
+                  height: 'auto',
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  p: 1,
+                  bgcolor: 'background.paper',
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                  p: 2,
+                  color: 'text.secondary',
+                }}
+              >
+                Set <code>VITE_EVENT_LOGO_URL</code> to display your event logo here.
+              </Box>
+            )}
+
+            {appConfig.logoLinkUrl && (
+              <Button
+                sx={{ mt: 2 }}
+                variant="outlined"
+                component="a"
+                href={appConfig.logoLinkUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {appConfig.logoLinkLabel}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </Stack>
     </Box>
   )
 }
