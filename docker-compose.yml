@@ -182,12 +182,12 @@ services:
       dockerfile: Dockerfile
     image: analytics:latest
     environment:
-      LATITUDE__POSTGRES_DB: ${DB_NAME:-wardrive}
-      LATITUDE__POSTGRES_USER: ${DB_USER:-postgres}
-      LATITUDE__POSTGRES_PWD: ${DB_PASSWORD:-postgres}
-      LATITUDE__POSTGRES_HOST: wardrive_db
-      LATITUDE__POSTGRES_PORT: ${DB_PORT:-5432}
-      LATITUDE__POSTGRES_SCHEMA: public
+      LATITUDE__POSTGRES_DB: ${LATITUDE__POSTGRES_DB:-postgres}
+      LATITUDE__POSTGRES_USER: ${LATITUDE__POSTGRES_USER:-postgres}
+      LATITUDE__POSTGRES_PWD: ${LATITUDE__POSTGRES_PWD:-postgres}
+      LATITUDE__POSTGRES_HOST: ${LATITUDE__POSTGRES_HOST:-wardrive_db}
+      LATITUDE__POSTGRES_PORT: ${LATITUDE__POSTGRES_PORT:-5432}
+      LATITUDE__POSTGRES_SCHEMA: ${LATITUDE__POSTGRES_SCHEMA:-public}
       LATITUDE_MASTER_KEY: ${LATITUDE_MASTER_KEY}
     depends_on:
       wardrive_db:

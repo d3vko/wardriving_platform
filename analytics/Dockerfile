@@ -1,6 +1,6 @@
 FROM node:20-slim AS base
 
-RUN apt-get update && apt-get install -y curl perl
+RUN apt-get update && apt-get install -y curl perl gettext-base
 RUN npm install -g @latitude-data/cli@1.10.6
 
 FROM base AS builder
@@ -33,4 +33,6 @@ WORKDIR /usr/src/app/build
 
 EXPOSE 3000
 
-CMD ["node", "build"]
+RUN chmod +x /usr/src/app/entrypoint.sh
+
+CMD ["/usr/src/app/entrypoint.sh"]
