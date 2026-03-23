@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   AppBar,
   Avatar,
@@ -22,9 +22,10 @@ import {
   Menu as MenuIcon,
   Home as HomeIcon,
   WifiFind as WifiFindIcon,
+  CellTower as CellTowerIcon,
   BarChart as BarChartIcon,
   CloudUpload as CloudUploadIcon,
-  Settings as SettingsIcon,
+  Download as DownloadIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -37,12 +38,22 @@ const DRAWER_WIDTH = 240
 const MINI_DRAWER_WIDTH = 64
 const STORAGE_KEY = 'wardrive-drawer-open'
 
-const navItems = [
-  { label: 'Dashboard', path: '/', icon: <HomeIcon /> },
-  { label: 'Wardriving', path: '/wardriving', icon: <WifiFindIcon /> },
+type NavItem =
+  | { label: string; path: string; icon: ReactNode; mapMode?: undefined }
+  | {
+      label: string
+      path: string
+      icon: ReactNode
+      mapMode: 'wifi' | 'lte'
+    }
+
+const navItems: NavItem[] = [
+  { label: 'Inicio', path: '/', icon: <HomeIcon /> },
+  { label: 'Wardriving', path: '/map', mapMode: 'wifi', icon: <WifiFindIcon /> },
+  { label: 'Wardriving LTE', path: '/map', mapMode: 'lte', icon: <CellTowerIcon /> },
   { label: 'Analytics', path: '/analytics', icon: <BarChartIcon /> },
   { label: 'Upload', path: '/upload', icon: <CloudUploadIcon /> },
-  { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+  { label: 'Descargas KML', path: '/downloads', icon: <DownloadIcon /> },
 ]
 
 interface LayoutProps {
@@ -85,13 +96,24 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
     navigate('/login', { replace: true })
   }
 
-  const handleNav = (path: string) => {
-    navigate(path)
+  const handleNav = (item: NavItem) => {
+    if (item.mapMode) {
+      navigate(`${item.path}?mode=${item.mapMode}`)
+    } else {
+      navigate(item.path)
+    }
     if (isMobile) setMobileOpen(false)
   }
 
-  const isSelected = (path: string) =>
-    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
+  const isSelected = (item: NavItem) => {
+    if (item.mapMode) {
+      if (location.pathname !== item.path) return false
+      const mode = new URLSearchParams(location.search).get('mode') ?? 'wifi'
+      return (item.mapMode === 'lte' && mode === 'lte') || (item.mapMode === 'wifi' && mode !== 'lte')
+    }
+    if (item.path === '/') return location.pathname === '/'
+    return location.pathname.startsWith(item.path)
+  }
 
   // Mini drawer: solo iconos con tooltip
   const miniDrawerContent = (
@@ -105,12 +127,16 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
       </Toolbar>
       <Divider sx={{ width: '100%' }} />
       <List sx={{ flexGrow: 1, pt: 1, width: '100%', px: 0.5 }}>
-        {navItems.map(({ label, path, icon }) => (
-          <ListItem key={path} disablePadding sx={{ mb: 0.5, justifyContent: 'center' }}>
-            <Tooltip title={label} placement="right">
+        {navItems.map((item) => (
+          <ListItem
+            key={item.mapMode ? `${item.path}-${item.mapMode}` : item.path}
+            disablePadding
+            sx={{ mb: 0.5, justifyContent: 'center' }}
+          >
+            <Tooltip title={item.label} placement="right">
               <ListItemButton
-                selected={isSelected(path)}
-                onClick={() => handleNav(path)}
+                selected={isSelected(item)}
+                onClick={() => handleNav(item)}
                 sx={{
                   borderRadius: 2,
                   justifyContent: 'center',
@@ -124,7 +150,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>{icon}</ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 0, justifyContent: 'center' }}>{item.icon}</ListItemIcon>
               </ListItemButton>
             </Tooltip>
           </ListItem>
@@ -167,11 +193,11 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
       </Toolbar>
       <Divider />
       <List sx={{ flexGrow: 1, px: 1, pt: 1 }}>
-        {navItems.map(({ label, path, icon }) => (
-          <ListItem key={path} disablePadding sx={{ mb: 0.5 }}>
+        {navItems.map((item) => (
+          <ListItem key={item.mapMode ? `${item.path}-${item.mapMode}` : item.path} disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
-              selected={isSelected(path)}
-              onClick={() => handleNav(path)}
+              selected={isSelected(item)}
+              onClick={() => handleNav(item)}
               sx={{
                 borderRadius: 2,
                 '&.Mui-selected': {
@@ -182,8 +208,8 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
                 },
               }}
             >
-              <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
-              <ListItemText primary={label} />
+              <ListItemIcon sx={{ minWidth: 36 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} />
             </ListItemButton>
           </ListItem>
         ))}

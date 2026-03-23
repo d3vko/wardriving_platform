@@ -233,6 +233,39 @@ Upload logs through DRF:
 
 ------------------------------------------------------------------------
 
+# 🗺️ KML Downloads (WiFi / LTE)
+
+Authenticated users can download KML files for their own scans.
+
+## API endpoints
+
+- `GET /wardriving/api/v1/wardrive/wifi-places/kml/`
+- `GET /wardriving/api/v1/wardrive/lte-places/kml/`
+
+Both endpoints:
+
+- Require JWT authentication.
+- Export data filtered by `uploaded_by == request.user.username`.
+- Return `404` with a clear message when there is no data to export.
+
+## Frontend flow
+
+- The **Home** menu item is the platform landing page.
+- The **KML Downloads** menu item provides:
+  - **Download WiFi KML**
+  - **Download LTE KML**
+- Errors (including empty queryset) are shown in-page.
+
+## Map pagination
+
+- Map endpoints use a dedicated pagination policy:
+  - default `page_size=1000`
+  - max `page_size=2000`
+- You can still control page and size from query params:
+  - `/wardriving/api/v1/wardrive/wifi-places/?page=1&page_size=1500`
+
+------------------------------------------------------------------------
+
 # 📈 Metabase Setup
 
 There is no automatic setup yet.

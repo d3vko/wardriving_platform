@@ -11,6 +11,8 @@ import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Upload from '@/pages/Upload'
 import Analytics from '@/pages/Analytics'
+import WardrivingMap from '@/pages/WardrivingMap'
+import KmlDownloads from '@/pages/KmlDownloads'
 
 type ColorMode = 'light' | 'dark'
 
@@ -54,10 +56,10 @@ export default function App() {
               }
             >
               <Route index element={<Home />} />
-              <Route path="wardriving" element={<Home />} />
+              <Route path="map" element={<WardrivingMap />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="upload" element={<Upload />} />
-              <Route path="settings" element={<Home />} />
+              <Route path="downloads" element={<KmlDownloads />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

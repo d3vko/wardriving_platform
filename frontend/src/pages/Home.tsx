@@ -47,12 +47,13 @@ export default function Home() {
       <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
         <WifiFindIcon color="primary" sx={{ fontSize: 32 }} />
         <Typography variant="h4" fontWeight={700}>
-          Dashboard
+          Inicio
         </Typography>
-        <Chip label="Live" color="success" size="small" />
+        <Chip label="Evento" color="primary" size="small" />
       </Stack>
       <Typography variant="body1" color="text.secondary" mb={4}>
-        Wardriving Contest Platform — monitor de redes en tiempo real.
+        Bienvenido a la plataforma del evento de Wardriving. Aqui podras cargar capturas, revisar
+        analiticas, explorar mapas WiFi/LTE y descargar tus resultados en KML.
       </Typography>
 
       <Grid container spacing={3}>
@@ -81,10 +82,11 @@ export default function Home() {
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} mb={2}>
-              Actividad reciente
+              Dinamica del evento
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Sin datos disponibles. Inicia un escaneo para ver actividad.
+              1) Recolecta muestras con dispositivos soportados. 2) Sube los archivos en la seccion
+              Upload. 3) Revisa tus hallazgos en mapa y analytics. 4) Exporta KML desde Descargas KML.
             </Typography>
           </CardContent>
         </Card>

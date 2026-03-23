@@ -104,4 +104,40 @@ export async function apiFetch<T = unknown>(
   return res.json() as Promise<T>
 }
 
+export async function apiFetchBlob(
+  path: string,
+  options: RequestInit & { skipAuth?: boolean } = {},
+): Promise<Blob> {
+  const { skipAuth = false, ...init } = options
+  const url = `${API_BASE}${path}`
+  const headers = new Headers(init.headers)
+
+  if (!skipAuth) {
+    const tokens = getTokens()
+    if (tokens?.access) {
+      headers.set('Authorization', `Bearer ${tokens.access}`)
+    }
+  }
+
+  let res = await fetch(url, { ...init, headers })
+
+  if (res.status === 401 && !skipAuth) {
+    const tokens = getTokens()
+    if (tokens?.refresh) {
+      const newAccess = await doRefresh(tokens.refresh)
+      if (newAccess) {
+        headers.set('Authorization', `Bearer ${newAccess}`)
+        res = await fetch(url, { ...init, headers })
+      } else {
+        clearTokens()
+        window.dispatchEvent(new CustomEvent('wardrive:logout'))
+        throw new ApiError(401, 'Sesion expirada. Por favor inicia sesion nuevamente.')
+      }
+    }
+  }
+
+  if (!res.ok) throw await parseError(res)
+  return res.blob()
+}
+
 export { getTokens, setTokens, clearTokens }

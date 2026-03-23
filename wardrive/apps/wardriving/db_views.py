@@ -7,6 +7,7 @@ from apps.wardriving.sql_views import (
 
 
 class WardrivingVendorsView(DBView):
+    id = models.BigIntegerField(primary_key=True)
     mac = models.CharField()
     registry = models.CharField()
     vendor = models.CharField()

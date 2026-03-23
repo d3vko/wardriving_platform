@@ -1,0 +1,70 @@
+from io import BytesIO
+from xml.sax.saxutils import escape
+
+import simplekml  # type: ignore[import-not-found]
+
+from django.http import HttpResponse
+
+
+def _build_description(rows: list[tuple[str, str]]) -> str:
+    table_rows = "".join(
+        f"<tr><td><b>{escape(str(k))}</b></td><td>{escape(str(v))}</td></tr>"
+        for k, v in rows
+    )
+    return (
+        "<![CDATA[<div style='font-family:Arial;font-size:13px;'>"
+        "<table border='1' cellpadding='4' cellspacing='0' style='border-collapse:collapse;'>"
+        f"{table_rows}"
+        "</table></div>]]>"
+    )
+
+
+def build_kml_response(
+    *,
+    queryset,
+    filename: str,
+    pin_color: str,
+    name_fn,
+    lat_fn,
+    lon_fn,
+    extra_fn,
+) -> HttpResponse:
+    """
+    Genera y descarga KML desde un queryset.
+
+    Cada callable recibe `obj` y devuelve:
+    - name_fn -> str para el nombre del pin
+    - lat_fn/lon_fn -> coordenadas
+    - extra_fn -> dict con metadatos para tabla/extended data
+    """
+    kml = simplekml.Kml()
+    icon_href = "https://raw.githubusercontent.com/AdrianPardo99/flipper_zero_anims_assets/refs/heads/hide/Ultra-hide-branch/misc_icons/kml_icon-v2_wo_back.png"
+
+    for obj in queryset:
+        lat = float(lat_fn(obj))
+        lon = float(lon_fn(obj))
+        extra_data = extra_fn(obj) or {}
+        name = str(name_fn(obj))
+
+        point = kml.newpoint(name=name, coords=[(lon, lat)])
+        point.style.iconstyle.icon.href = icon_href
+        point.style.iconstyle.color = pin_color
+        point.style.iconstyle.scale = 1.1
+
+        if extra_data:
+            point.description = _build_description(
+                [(str(k), "" if v is None else str(v)) for k, v in extra_data.items()]
+            )
+            ext = simplekml.ExtendedData()
+            for k, v in extra_data.items():
+                ext.newdata(name=str(k), value="" if v is None else str(v))
+            point.extendeddata = ext
+
+    buffer = BytesIO()
+    buffer.write(kml.kml().encode("utf-8"))
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.google-earth.kml+xml",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

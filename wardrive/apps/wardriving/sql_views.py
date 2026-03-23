@@ -2,6 +2,7 @@ class WardrivingVendorsSQL:
     view_definition = {
         "django.db.backends.postgresql": r"""
         SELECT
+            wardriving.id,
             wardriving.mac,
             COALESCE(vendor.registry, 'Not setted yet') AS registry,
             COALESCE(vendor.organization_name, 'Not found yet') AS vendor,
