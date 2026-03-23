@@ -32,7 +32,7 @@ export type PlacesListParams = {
 }
 
 function buildPlacesUrl(
-  resource: 'wifi-places' | 'lte-places',
+  resource: 'wifi' | 'lte',
   params: PlacesListParams,
 ): string {
   const sp = new URLSearchParams()
@@ -46,17 +46,17 @@ function buildPlacesUrl(
 }
 
 export function fetchWifiPlaces(params: PlacesListParams): Promise<PaginatedPlaces> {
-  return apiFetch<PaginatedPlaces>(buildPlacesUrl('wifi-places', params))
+  return apiFetch<PaginatedPlaces>(buildPlacesUrl('wifi', params))
 }
 
 export function fetchLtePlaces(params: PlacesListParams): Promise<PaginatedPlaces> {
-  return apiFetch<PaginatedPlaces>(buildPlacesUrl('lte-places', params))
+  return apiFetch<PaginatedPlaces>(buildPlacesUrl('lte', params))
 }
 
 type KmlKind = 'wifi' | 'lte'
 
 function kmlPath(kind: KmlKind): string {
-  return kind === 'wifi' ? '/wardrive/wifi-places/kml/' : '/wardrive/lte-places/kml/'
+  return kind === 'wifi' ? '/wardrive/wifi/kml/' : '/wardrive/lte/kml/'
 }
 
 function downloadBlob(blob: Blob, filename: string): void {

@@ -19,8 +19,6 @@ if [ "$ENVIRONMENT" == "local" ]; then
     bash /code/wait.sh $DB_HOST:$DB_PORT
 fi
 
-# Fake users.0001_initial si la BD ya existia antes de introducir AUTH_USER_MODEL
-python /code/wardrive/pre_migrate.py
 
 # Run Django migrations
 python /code/wardrive/manage.py migrate

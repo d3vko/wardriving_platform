@@ -15,7 +15,7 @@ def rssi_to_signal_strength(rssi: int) -> str:
     return "Weak"
 
 
-class WifiPlaceSerializer(serializers.ModelSerializer):
+class WifiWardrivingSerializer(serializers.ModelSerializer):
     """
     WiFi desde la vista SQL `wardriving_vendor`: vendor y signal_streng ya vienen
     del JOIN y del CASE en SQL (sin duplicar lógica en Python).
@@ -40,7 +40,7 @@ class WifiPlaceSerializer(serializers.ModelSerializer):
         )
 
 
-class LtePlaceSerializer(serializers.ModelSerializer):
+class LteWardrivingSerializer(serializers.ModelSerializer):
     """Misma forma que WiFi para un solo tipo en el frontend."""
 
     mac = serializers.SerializerMethodField()

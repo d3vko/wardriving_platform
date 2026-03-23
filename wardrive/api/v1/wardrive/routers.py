@@ -1,16 +1,16 @@
 from rest_framework.routers import DefaultRouter
 
-from .views import LtePlacesViewSet, WifiPlacesViewSet
+from .views import LteWardrivingViewSet, WifiWardrivingViewSet
 
 router = DefaultRouter()
 
 router.register(
-    prefix="wifi-places",
-    viewset=WifiPlacesViewSet,
-    basename="wardrive-wifi-places",
+    prefix="wifi",
+    viewset=WifiWardrivingViewSet,
+    basename="wardrive-wifi",
 )
 router.register(
-    prefix="lte-places",
-    viewset=LtePlacesViewSet,
-    basename="wardrive-lte-places",
+    prefix="lte",
+    viewset=LteWardrivingViewSet,
+    basename="wardrive-lte",
 )

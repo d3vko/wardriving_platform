@@ -10,13 +10,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.wardriving.db_views import WardrivingVendorsView
-from apps.wardriving.filters import LtePlacesFilter, WifiPlacesFilter
+from apps.wardriving.filters import LteWardrivingFilterSet, WifiWardrivingFilterSet
 from apps.wardriving.kml_utils import build_kml_response
 from apps.wardriving.models import LTEWardriving
 
 from api.pagination import MapPlacesPagination
 
-from .serializers import LtePlaceSerializer, WifiPlaceSerializer
+from .serializers import LteWardrivingSerializer, WifiWardrivingSerializer
 
 pagination_params = [
     openapi.Parameter(
@@ -63,20 +63,20 @@ def _exclude_default_coords():
     return ~Q(current_latitude=0, current_longitude=0)
 
 
-class WifiPlacesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     Puntos WiFi con coordenadas reales desde la vista SQL `wardriving_vendor`
     (vendor + señal ya calculados en BD).
     """
 
-    serializer_class = WifiPlaceSerializer
+    serializer_class = WifiWardrivingSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = MapPlacesPagination
     filter_backends = [filters.DjangoFilterBackend]
-    filterset_class = WifiPlacesFilter
+    filterset_class = WifiWardrivingFilterSet
 
     def get_queryset(self):
-        return WardrivingVendorsView.objects.all().order_by("-first_seen")
+        return WardrivingVendorsView.objects.all()
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
@@ -87,7 +87,6 @@ class WifiPlacesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         queryset = (
             self.get_queryset()
             .filter(uploaded_by=request.user.username)
-            .order_by("-first_seen")
         )
         if not queryset.exists():
             return Response(
@@ -115,14 +114,14 @@ class WifiPlacesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         )
 
 
-class LtePlacesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """Puntos LTE homogeneizados al mismo shape que WiFi para el mapa."""
 
-    serializer_class = LtePlaceSerializer
+    serializer_class = LteWardrivingSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = MapPlacesPagination
     filter_backends = [filters.DjangoFilterBackend]
-    filterset_class = LtePlacesFilter
+    filterset_class = LteWardrivingFilterSet
 
     def get_queryset(self):
         return (

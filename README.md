@@ -264,8 +264,8 @@ Authenticated users can download KML files for their own scans.
 
 ## API endpoints
 
-- `GET /wardriving/api/v1/wardrive/wifi-places/kml/`
-- `GET /wardriving/api/v1/wardrive/lte-places/kml/`
+- `GET /wardriving/api/v1/wardrive/wifi/kml/`
+- `GET /wardriving/api/v1/wardrive/lte/kml/`
 
 Both endpoints:
 
@@ -287,7 +287,8 @@ Both endpoints:
   - default `page_size=1000`
   - max `page_size=2000`
 - You can still control page and size from query params:
-  - `/wardriving/api/v1/wardrive/wifi-places/?page=1&page_size=1500`
+  - `/wardriving/api/v1/wardrive/wifi/?page=1&page_size=1500`
+  - `/wardriving/api/v1/wardrive/lte/?page=1&page_size=1500`
 
 ------------------------------------------------------------------------
 

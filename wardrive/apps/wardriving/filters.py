@@ -4,7 +4,7 @@ from apps.wardriving.db_views import WardrivingVendorsView
 from apps.wardriving.models import LTEWardriving
 
 
-class WifiPlacesFilter(filters.FilterSet):
+class WifiWardrivingFilterSet(filters.FilterSet):
     """Filtros opcionales para el listado mapa WiFi (vista SQL wardriving_vendor)."""
 
     uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
@@ -16,7 +16,7 @@ class WifiPlacesFilter(filters.FilterSet):
         fields: list[str] = []
 
 
-class LtePlacesFilter(filters.FilterSet):
+class LteWardrivingFilterSet(filters.FilterSet):
     """Filtros opcionales para LTE (modelo LTEWardriving)."""
 
     uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
