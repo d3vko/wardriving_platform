@@ -29,6 +29,7 @@ dump_bd*
 dump_data_base*
 dump.sql
 *.sql
+!analytics/queries/**/*.sql
 db_wardrive.json
 
 # Wardriving capture files

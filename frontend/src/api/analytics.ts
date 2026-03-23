@@ -1,4 +1,9 @@
-const ANALYTICS_API = (import.meta.env.VITE_ANALYTICS_API_URL || '/analytics/api').replace(
+const DEFAULT_ANALYTICS_API =
+  typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}:3001/api`
+    : 'http://localhost:3001/api'
+
+const ANALYTICS_API = (import.meta.env.VITE_ANALYTICS_API_URL || DEFAULT_ANALYTICS_API).replace(
   /\/$/,
   '',
 )

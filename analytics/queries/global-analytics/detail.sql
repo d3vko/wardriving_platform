@@ -1,0 +1,29 @@
+{@config ttl = 60}
+
+{ first_seen_start = param('first_seen_start', '2025-01-01T00:00:00-06:00') }
+{ first_seen_end   = param('first_seen_end',   '2026-05-30T00:00:00-06:00') }
+
+SELECT
+    mac,
+    registry,
+    vendor,
+    source,
+    ssid,
+    auth_mode,
+    first_seen,
+    channel,
+    rssi,
+    signal_streng,
+    device_source,
+    uploaded_by,
+    type,
+    current_latitude,
+    current_longitude,
+    altitude_meters,
+    accuracy_meters
+FROM wardriving_vendor
+WHERE
+    first_seen BETWEEN { first_seen_start }::timestamptz AND { first_seen_end }::timestamptz
+
+ORDER BY first_seen DESC
+LIMIT 150;
