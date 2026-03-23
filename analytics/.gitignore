@@ -1,4 +1,5 @@
 .DS_Store
+# DEPRECATED: analytics/.env is not used; use root .env via docker-compose env_file.
 .env
 node_modules/
 build/

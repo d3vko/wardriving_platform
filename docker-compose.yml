@@ -181,6 +181,7 @@ services:
       context: ./analytics
       dockerfile: Dockerfile
     image: analytics:latest
+    env_file: .env
     environment:
       LATITUDE__POSTGRES_DB: ${LATITUDE__POSTGRES_DB:-postgres}
       LATITUDE__POSTGRES_USER: ${LATITUDE__POSTGRES_USER:-postgres}
