@@ -196,7 +196,9 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 FORCE_SCRIPT_NAME=/wardriving
 ```
 
-Frontend event branding and texts can be configured with `frontend/.env`:
+Frontend event branding and texts can be configured with `VITE_*` variables.
+For container builds (Docker/Podman compose), use the **root** `.env` as source of truth.
+For local frontend dev (`bun run dev`), you can optionally use `frontend/.env`.
 
 ```bash
 VITE_APP_TITLE=Wardriving CTF
@@ -217,6 +219,7 @@ VITE_EVENT_LOGO_LINK_LABEL=Open Event Website
 Notes:
 - Use `\n` in env values to render line breaks in the Home page dynamics text.
 - `VITE_APP_TITLE` and `VITE_APP_FAVICON_URL` are applied at runtime in the frontend.
+- In compose-based deployments, `VITE_*` values are injected at image build time via `build.args`.
 
 Start the services:
 
