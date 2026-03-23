@@ -192,6 +192,14 @@ services:
     depends_on:
       wardrive_db:
         condition: service_healthy
+    ports:
+      - "${ANALYTICS_BIND_IP:-0.0.0.0}:3001:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const net=require('net');const s=net.connect(3000,'127.0.0.1');s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),3000);\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     restart: unless-stopped
 
   wardrive_proxy:
@@ -200,6 +208,7 @@ services:
       - wardrive
       - wardrive_bi
       - wardrive-frontend
+      - analytics
     ports:
       - "8000:8000"
     volumes:

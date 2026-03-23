@@ -1,4 +1,7 @@
-const ANALYTICS_API = import.meta.env.VITE_ANALYTICS_API_URL || '/analytics/api'
+const ANALYTICS_API = (import.meta.env.VITE_ANALYTICS_API_URL || '/analytics/api').replace(
+  /\/$/,
+  '',
+)
 
 export const ANALYTICS_DEFAULTS = {
   startDate:
