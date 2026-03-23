@@ -20,6 +20,7 @@ ALLOWED_HOSTS = env.list(
 
 
 INSTALLED_APPS = [
+    "apps.users",  # debe ir antes de django.contrib.auth para el swap
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -40,6 +41,8 @@ INSTALLED_APPS = [
     "apps.files",
     "apps.vendors",
 ]
+
+AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

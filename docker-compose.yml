@@ -20,8 +20,8 @@ volumes:
   minio_data: {}
   static_volume:
   media_volume:
-  ctfd_logs:
-  ctfd_uploads:
+  # ctfd_logs:    # deprecated — CTFd reemplazado por wardrive-frontend
+  # ctfd_uploads: # deprecated — CTFd reemplazado por wardrive-frontend
 
 services:
   minio:
@@ -106,29 +106,46 @@ services:
     env_file: .env
     restart: on-failure
 
-  ctfd_platform:
+  # ── wardrive-frontend ────────────────────────────────────────────────────────
+  # SPA React (Bun + Vite + MUI) servida por nginx bajo /ctf/
+  # Reemplaza ctfd_platform. Para desarrollo: usa el profile "dev" con volumen.
+  wardrive-frontend:
     build:
-      context: ./ctfd
+      context: ./frontend
       dockerfile: Dockerfile
-    volumes:
-      - ctfd_logs:/opt/CTFd/logs
-      - ctfd_uploads:/opt/CTFd/uploads
-    environment:
-      - REVERSE_PROXY=true
-      - APPLICATION_ROOT=/ctf
-      - DATABASE_URL=postgresql://postgres:postgres@wardrive_db:5432/ctfd
-      # MinIO/S3: second bucket (CTFd). Wardrive uses AWS_STORAGE_BUCKET_NAME.
-      - UPLOAD_PROVIDER=s3
-      - AWS_S3_BUCKET=${CTFD_S3_BUCKET:-ctfd}
-      - AWS_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+    image: wardrive-frontend
     depends_on:
-      wardrive_db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
+      - wardrive
     restart: on-failure
+    # profiles:                 # descomenta para exponer en desarrollo directamente
+    #   - dev
+    # ports:
+    #   - "5173:5173"           # solo para dev con bun run dev (sin build)
+
+  # ── ctfd_platform (DEPRECATED) ───────────────────────────────────────────────
+  # Sustituido por wardrive-frontend. Ejecuta ./cleanup_ctfd.sh para limpiar.
+  # ctfd_platform:
+  #   build:
+  #     context: ./ctfd
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ctfd_logs:/opt/CTFd/logs
+  #     - ctfd_uploads:/opt/CTFd/uploads
+  #   environment:
+  #     - REVERSE_PROXY=true
+  #     - APPLICATION_ROOT=/ctf
+  #     - DATABASE_URL=postgresql://postgres:postgres@wardrive_db:5432/ctfd
+  #     - UPLOAD_PROVIDER=s3
+  #     - AWS_S3_BUCKET=${CTFD_S3_BUCKET:-ctfd}
+  #     - AWS_S3_ENDPOINT_URL=http://minio:9000
+  #     - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+  #     - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+  #   depends_on:
+  #     wardrive_db:
+  #       condition: service_healthy
+  #     minio:
+  #       condition: service_healthy
+  #   restart: on-failure
 
   wardrive_bi:
     image: metabase/metabase:v0.58.6
@@ -147,6 +164,7 @@ services:
     depends_on:
       - wardrive
       - wardrive_bi
+      - wardrive-frontend
     ports:
       - "8000:8000"
     volumes:

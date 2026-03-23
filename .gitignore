@@ -1,16 +1,45 @@
+# Python
 __pycache__/
-.vscode
+*.pyc
+*.pyo
 
-# local virtual environments
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment / secrets
 .env
-.venv
+.env.*
+!.env.example
 
+# Django
 media/
 staticfiles/
+
+# Logs
 *.log
-*json
+
+# Dumps (DB exports, capturas, etc.)
+dump_db*
+dump_bd*
+dump_data_base*
+dump.sql
+*.sql
+db_wardrive.json
+
+# Wardriving capture files
 *.pcap
 *.kml
 
-.env.railway
-*.sql
+# Node / Bun
+node_modules/
+frontend/dist/
+frontend/.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
