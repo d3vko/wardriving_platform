@@ -1,0 +1,5 @@
+.git*
+.latitude
+README.md
+build
+node_modules

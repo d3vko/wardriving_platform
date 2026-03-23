@@ -1,0 +1,123 @@
+<svelte:head>
+  <title>Global Analytics</title>
+</svelte:head>
+
+<View class="gap-8 py-4 h-full justify-center">
+
+  <!-- Filtros -->
+  <Card.Root>
+    <Card.Content class="p-6">
+      <Row class="gap-4 items-end flex-wrap">
+        <Column>
+          <Text.H5 class="font-medium mb-1">Desde</Text.H5>
+          <DatePicker param="first_seen_start" value="2025-01-01T00:00:00-06:00" />
+        </Column>
+        <Column>
+          <Text.H5 class="font-medium mb-1">Hasta</Text.H5>
+          <DatePicker param="first_seen_end" value="2026-05-30T00:00:00-06:00" />
+        </Column>
+        <RunButton>Aplicar</RunButton>
+      </Row>
+    </Card.Content>
+  </Card.Root>
+
+  <!-- Fila de PieCharts -->
+  <Row class="gap-6 flex-wrap">
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="global-analytics/auth-modes"
+          title="Modos de Autenticación"
+          description="Distribución global de auth_mode"
+          nameCol="auth_mode"
+          valueCol="qty_auth"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="global-analytics/by-device"
+          title="Dispositivos"
+          description="Distribución global por device_source"
+          nameCol="device_source"
+          valueCol="qty_device"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="global-analytics/by-author"
+          title="Contribuidores"
+          description="Registros por usuario (uploaded_by)"
+          nameCol="uploaded_by"
+          valueCol="qty_by_author"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="global-analytics/by-signal"
+          title="Intensidad de Señal"
+          description="Distribución global por signal_streng"
+          nameCol="signal_streng"
+          valueCol="qty_by_signal"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="global-analytics/by-vendor"
+          title="Fabricantes"
+          description="Top fabricantes detectados globalmente"
+          nameCol="vendor"
+          valueCol="qty_by_vendor"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+  </Row>
+
+  <!-- BarChart de auth modes -->
+  <Card.Root>
+    <Card.Content class="p-8">
+      <BarChart
+        query="global-analytics/auth-modes"
+        title="Modos de Autenticación (Global)"
+        description="Distribución global de auth_mode"
+        x="auth_mode"
+        y="qty_auth"
+        xTitle="Modo"
+        yTitle="Cantidad"
+        animation="true"
+        opts={{ reactToParams: 500 }}
+      />
+    </Card.Content>
+  </Card.Root>
+
+  <!-- Tabla detalle -->
+  <Card.Root>
+    <Card.Content class="p-8">
+      <Table
+        query="global-analytics/detail"
+        title="Detalle global de registros"
+        description="Todos los registros del periodo seleccionado"
+        opts={{ reactToParams: 500 }}
+      />
+    </Card.Content>
+  </Card.Root>
+
+</View>

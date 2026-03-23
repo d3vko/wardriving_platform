@@ -1,0 +1,114 @@
+<svelte:head>
+  <title>Self Analytics</title>
+</svelte:head>
+
+<View class="gap-8 py-4 h-full justify-center">
+
+  <!-- Filtros -->
+  <Card.Root>
+    <Card.Content class="p-6">
+      <Row class="gap-4 items-end flex-wrap">
+        <Column>
+          <Text.H5 class="font-medium mb-1">Desde</Text.H5>
+          <DatePicker param="first_seen_start" value="2025-01-01T00:00:00-06:00" />
+        </Column>
+        <Column>
+          <Text.H5 class="font-medium mb-1">Hasta</Text.H5>
+          <DatePicker param="first_seen_end" value="2026-05-30T00:00:00-06:00" />
+        </Column>
+        <Column>
+          <Text.H5 class="font-medium mb-1">Usuario (uploaded_by)</Text.H5>
+          <Input param="author" placeholder="Filtrar por usuario..." />
+        </Column>
+        <RunButton>Aplicar</RunButton>
+      </Row>
+    </Card.Content>
+  </Card.Root>
+
+  <!-- Fila de PieCharts -->
+  <Row class="gap-6 flex-wrap">
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="self-analytics/auth-modes"
+          title="Modos de Autenticación"
+          description="Distribución de auth_mode"
+          nameCol="auth_mode"
+          valueCol="qty_auth"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="self-analytics/by-device"
+          title="Dispositivos"
+          description="Distribución por device_source"
+          nameCol="device_source"
+          valueCol="qty_device"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="self-analytics/by-signal"
+          title="Intensidad de Señal"
+          description="Distribución por signal_streng"
+          nameCol="signal_streng"
+          valueCol="qty_by_signal"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+    <Card.Root class="flex-1 min-w-[280px]">
+      <Card.Content class="p-6">
+        <PieChart
+          query="self-analytics/by-vendor"
+          title="Fabricantes"
+          description="Top fabricantes detectados"
+          nameCol="vendor"
+          valueCol="qty_by_vendor"
+          opts={{ reactToParams: 500 }}
+        />
+      </Card.Content>
+    </Card.Root>
+
+  </Row>
+
+  <!-- BarChart de auth modes -->
+  <Card.Root>
+    <Card.Content class="p-8">
+      <BarChart
+        query="self-analytics/auth-modes"
+        title="Modos de Autenticación"
+        description="Cantidad de registros por auth_mode"
+        x="auth_mode"
+        y="qty_auth"
+        xTitle="Modo"
+        yTitle="Cantidad"
+        animation="true"
+        opts={{ reactToParams: 500 }}
+      />
+    </Card.Content>
+  </Card.Root>
+
+  <!-- Tabla detalle -->
+  <Card.Root>
+    <Card.Content class="p-8">
+      <Table
+        query="self-analytics/detail"
+        title="Detalle de registros"
+        description="Todos los registros para el usuario y periodo seleccionados"
+        opts={{ reactToParams: 500 }}
+      />
+    </Card.Content>
+  </Card.Root>
+
+</View>

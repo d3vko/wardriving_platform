@@ -10,6 +10,7 @@ import Home from '@/pages/Home'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Upload from '@/pages/Upload'
+import Analytics from '@/pages/Analytics'
 
 type ColorMode = 'light' | 'dark'
 
@@ -54,7 +55,7 @@ export default function App() {
             >
               <Route index element={<Home />} />
               <Route path="wardriving" element={<Home />} />
-              <Route path="analytics" element={<Home />} />
+              <Route path="analytics" element={<Analytics />} />
               <Route path="upload" element={<Upload />} />
               <Route path="settings" element={<Home />} />
               <Route path="*" element={<Navigate to="/" replace />} />

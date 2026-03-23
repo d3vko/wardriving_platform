@@ -159,6 +159,26 @@ services:
       retries: 5
       start_period: 30s
 
+  analytics:
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    image: analytics:latest
+    ports:
+      - "3001:3000"
+    environment:
+      LATITUDE__POSTGRES_DB: ${DB_NAME:-wardrive}
+      LATITUDE__POSTGRES_USER: ${DB_USER:-postgres}
+      LATITUDE__POSTGRES_PWD: ${DB_PASSWORD:-postgres}
+      LATITUDE__POSTGRES_HOST: wardrive_db
+      LATITUDE__POSTGRES_PORT: ${DB_PORT:-5432}
+      LATITUDE__POSTGRES_SCHEMA: public
+      LATITUDE_MASTER_KEY: ${LATITUDE_MASTER_KEY}
+    depends_on:
+      wardrive_db:
+        condition: service_healthy
+    restart: unless-stopped
+
   wardrive_proxy:
     image: nginx:1.28.0
     depends_on:
