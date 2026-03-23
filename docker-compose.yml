@@ -164,8 +164,6 @@ services:
       context: ./analytics
       dockerfile: Dockerfile
     image: analytics:latest
-    ports:
-      - "3001:3000"
     environment:
       LATITUDE__POSTGRES_DB: ${DB_NAME:-wardrive}
       LATITUDE__POSTGRES_USER: ${DB_USER:-postgres}
