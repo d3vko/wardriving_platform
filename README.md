@@ -100,6 +100,8 @@ Quick overview of the technologies used:
 -   ⚙️ **Celery + Celery Beat** for parallel file processing
 -   🏗️ Easy deployment with Docker Compose or Podman Compose
 
+**Additional documentation (English):** [`docs/PROJECT_SCAN_WARDRIVE.md`](docs/PROJECT_SCAN_WARDRIVE.md), [`docs/METABASE_PROXY_FIX.md`](docs/METABASE_PROXY_FIX.md), [`docs/BUGS_AND_BAD_PRACTICES.md`](docs/BUGS_AND_BAD_PRACTICES.md), [`docs/STATIC_MEDIA_MINIO_PLAN.md`](docs/STATIC_MEDIA_MINIO_PLAN.md), [`PROMPT_ANALYTICS.md`](PROMPT_ANALYTICS.md).
+
 ------------------------------------------------------------------------
 
 # 📡 Supported Technologies, Formats & Hardware
@@ -267,11 +269,22 @@ Authenticated users can download KML files for their own scans.
 - `GET /wardriving/api/v1/wardrive/wifi/kml/`
 - `GET /wardriving/api/v1/wardrive/lte/kml/`
 
+Query parameters (same semantics as the list endpoints):
+
+- **`first_seen_after`** (required): ISO 8601; the server normalizes to the **start** of that calendar day in the timezone of the value (or `TIME_ZONE` if the value is naive).
+- **`first_seen_before`** (required): ISO 8601; normalized to the **end** of that calendar day in the same way.
+- **`uploaded_by`** (optional): optional extra filter (icontains), same as list.
+
+Example:
+
+- `/wardriving/api/v1/wardrive/wifi/kml/?first_seen_after=2025-01-01T00:00:00Z&first_seen_before=2025-01-31T23:59:59Z`
+
 Both endpoints:
 
 - Require JWT authentication.
-- Export data filtered by `uploaded_by == request.user.username`.
-- Return `404` with a clear message when there is no data to export.
+- Require **`first_seen_after` and `first_seen_before`** (otherwise **`400`**) to keep exports bounded and avoid proxy timeouts.
+- Export data filtered by `uploaded_by == request.user.username`, plus any optional filters above.
+- Return `404` with a clear message when there is no data to export for that range.
 
 ## Frontend flow
 
@@ -286,8 +299,10 @@ Both endpoints:
 - Map endpoints use a dedicated pagination policy:
   - default `page_size=1000`
   - max `page_size=2000`
-- You can still control page and size from query params:
-  - `/wardriving/api/v1/wardrive/wifi/?page=1&page_size=1500`
+- The map UI loads **1000 points per view** as **four parallel requests** of **250** (`page` advances by 4 per “map page”: pages `(P-1)*4+1` … `(P-1)*4+4`).
+- Optional filters: `uploaded_by`, `first_seen_after`, `first_seen_before` (date bounds are normalized server-side to full calendar days in the timezone of each value).
+- Example:
+  - `/wardriving/api/v1/wardrive/wifi/?page=1&page_size=250&first_seen_after=2025-01-01T00:00:00Z&first_seen_before=2025-12-31T23:59:59Z`
   - `/wardriving/api/v1/wardrive/lte/?page=1&page_size=1500`
 
 ------------------------------------------------------------------------

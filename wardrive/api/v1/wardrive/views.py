@@ -22,13 +22,13 @@ pagination_params = [
     openapi.Parameter(
         "page",
         openapi.IN_QUERY,
-        description="Número de página",
+        description="Page number",
         type=openapi.TYPE_INTEGER,
     ),
     openapi.Parameter(
         "page_size",
         openapi.IN_QUERY,
-        description="Tamaño de página (por defecto 1000, máx. 2000 en mapas)",
+        description="Page size (default 1000, max 2000 for map endpoints)",
         type=openapi.TYPE_INTEGER,
     ),
 ]
@@ -37,26 +37,38 @@ filter_params = [
     openapi.Parameter(
         "uploaded_by",
         openapi.IN_QUERY,
-        description="Filtrar por texto en el campo uploaded_by (contiene, sin distinguir mayúsculas)",
+        description="Filter by substring in uploaded_by (case-insensitive contains)",
         type=openapi.TYPE_STRING,
     ),
     openapi.Parameter(
         "first_seen_after",
         openapi.IN_QUERY,
-        description="first_seen mayor o igual (ISO 8601)",
+        description=(
+            "first_seen lower bound (ISO 8601). Normalized to start of calendar day in the "
+            "datetime's timezone (or TIME_ZONE if naive)."
+        ),
         type=openapi.TYPE_STRING,
         format=openapi.FORMAT_DATETIME,
     ),
     openapi.Parameter(
         "first_seen_before",
         openapi.IN_QUERY,
-        description="first_seen menor o igual (ISO 8601)",
+        description=(
+            "first_seen upper bound (ISO 8601). Normalized to end of calendar day in the "
+            "datetime's timezone (or TIME_ZONE if naive)."
+        ),
         type=openapi.TYPE_STRING,
         format=openapi.FORMAT_DATETIME,
     ),
 ]
 
 list_params = pagination_params + filter_params
+
+kml_operation_description = (
+    "Exports KML for the authenticated user only. "
+    "**Required:** `first_seen_after` and `first_seen_before` (ISO 8601) to bound the range "
+    "and avoid timeouts; same filters as the list endpoint (including full-day normalization)."
+)
 
 
 def _exclude_default_coords():
@@ -65,8 +77,8 @@ def _exclude_default_coords():
 
 class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
-    Puntos WiFi con coordenadas reales desde la vista SQL `wardriving_vendor`
-    (vendor + señal ya calculados en BD).
+    WiFi points with real coordinates from the SQL view `wardriving_vendor`
+    (vendor + signal strength computed in the database).
     """
 
     serializer_class = WifiWardrivingSerializer
@@ -82,15 +94,30 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(
+        manual_parameters=list_params,
+        operation_description=kml_operation_description,
+    )
     @action(methods=["get"], detail=False, url_path="kml")
     def download_kml(self, request, *args, **kwargs):
-        queryset = (
-            self.get_queryset()
-            .filter(uploaded_by=request.user.username)
-        )
+        if not request.query_params.get("first_seen_after") or not request.query_params.get(
+            "first_seen_before"
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "KML export requires both first_seen_after and first_seen_before "
+                        "(ISO 8601) with a bounded date range."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(uploaded_by=request.user.username)
+        ).order_by("-first_seen")
         if not queryset.exists():
             return Response(
-                {"detail": "No hay muestras WiFi para exportar en tu usuario."},
+                {"detail": "No WiFi samples to export for your user in this date range."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return build_kml_response(
@@ -115,7 +142,7 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
 
 class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    """Puntos LTE homogeneizados al mismo shape que WiFi para el mapa."""
+    """LTE points shaped like WiFi for the map UI."""
 
     serializer_class = LteWardrivingSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -130,19 +157,33 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
-        """Listado paginado con filtros opcionales."""
+        """Paginated list with optional filters."""
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(
+        manual_parameters=list_params,
+        operation_description=kml_operation_description,
+    )
     @action(methods=["get"], detail=False, url_path="kml")
     def download_kml(self, request, *args, **kwargs):
-        queryset = (
-            self.get_queryset()
-            .filter(uploaded_by=request.user.username)
-            .order_by("-first_seen")
-        )
+        if not request.query_params.get("first_seen_after") or not request.query_params.get(
+            "first_seen_before"
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "KML export requires both first_seen_after and first_seen_before "
+                        "(ISO 8601) with a bounded date range."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        queryset = self.filter_queryset(
+            self.get_queryset().filter(uploaded_by=request.user.username)
+        ).order_by("-first_seen")
         if not queryset.exists():
             return Response(
-                {"detail": "No hay muestras LTE para exportar en tu usuario."},
+                {"detail": "No LTE samples to export for your user in this date range."},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return build_kml_response(

@@ -93,7 +93,7 @@ export async function apiFetch<T = unknown>(
       } else {
         clearTokens()
         window.dispatchEvent(new CustomEvent('wardrive:logout'))
-        throw new ApiError(401, 'Sesion expirada. Por favor inicia sesion nuevamente.')
+        throw new ApiError(401, 'Session expired. Please sign in again.')
       }
     }
   }
@@ -131,7 +131,7 @@ export async function apiFetchBlob(
       } else {
         clearTokens()
         window.dispatchEvent(new CustomEvent('wardrive:logout'))
-        throw new ApiError(401, 'Sesion expirada. Por favor inicia sesion nuevamente.')
+        throw new ApiError(401, 'Session expired. Please sign in again.')
       }
     }
   }

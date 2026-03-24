@@ -5,7 +5,7 @@ from apps.wardriving.models import LTEWardriving
 
 
 def rssi_to_signal_strength(rssi: int) -> str:
-    """Misma lógica que la vista SQL wardriving_vendor (LTE no usa la vista)."""
+    """Same buckets as the wardriving_vendor SQL view (LTE does not use that view)."""
     if rssi > -50:
         return "Excellent"
     if -60 <= rssi <= -50:
@@ -17,8 +17,8 @@ def rssi_to_signal_strength(rssi: int) -> str:
 
 class WifiWardrivingSerializer(serializers.ModelSerializer):
     """
-    WiFi desde la vista SQL `wardriving_vendor`: vendor y signal_streng ya vienen
-    del JOIN y del CASE en SQL (sin duplicar lógica en Python).
+    WiFi from SQL view `wardriving_vendor`: vendor and signal_streng come from the JOIN and
+    CASE in SQL (no duplicate logic in Python).
     """
 
     current_latitude = serializers.FloatField()
@@ -41,7 +41,7 @@ class WifiWardrivingSerializer(serializers.ModelSerializer):
 
 
 class LteWardrivingSerializer(serializers.ModelSerializer):
-    """Misma forma que WiFi para un solo tipo en el frontend."""
+    """Same shape as WiFi for a single frontend type."""
 
     mac = serializers.SerializerMethodField()
     vendor = serializers.CharField(source="provider")

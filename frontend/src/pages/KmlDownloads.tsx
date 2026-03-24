@@ -1,29 +1,58 @@
 import { useState } from 'react'
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Stack, Typography } from '@mui/material'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 import DownloadIcon from '@mui/icons-material/Download'
 
+import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import { ApiError } from '@/api/client'
 import { downloadLteKml, downloadWifiKml } from '@/api/wardriveMap'
+import { datetimeLocalToIso, isoToDatetimeLocalValue } from '@/utils/datetimeLocal'
 
 type DownloadKind = 'wifi' | 'lte' | null
 
 export default function KmlDownloads() {
   const [loading, setLoading] = useState<DownloadKind>(null)
   const [error, setError] = useState<string | null>(null)
+  const [afterLocal, setAfterLocal] = useState(() =>
+    isoToDatetimeLocalValue(ANALYTICS_DEFAULTS.startDate),
+  )
+  const [beforeLocal, setBeforeLocal] = useState(() =>
+    isoToDatetimeLocalValue(ANALYTICS_DEFAULTS.endDate),
+  )
 
   const handleDownload = async (kind: Exclude<DownloadKind, null>) => {
     setError(null)
+    if (!afterLocal || !beforeLocal) {
+      setError('Set both start and end of the range (date and time).')
+      return
+    }
+    const first_seen_after = datetimeLocalToIso(afterLocal)
+    const first_seen_before = datetimeLocalToIso(beforeLocal)
+    if (new Date(first_seen_after) > new Date(first_seen_before)) {
+      setError('The start of the range must be before or equal to the end.')
+      return
+    }
     setLoading(kind)
     try {
-      if (kind === 'wifi') await downloadWifiKml()
-      else await downloadLteKml()
+      const params = { first_seen_after, first_seen_before }
+      if (kind === 'wifi') await downloadWifiKml(params)
+      else await downloadLteKml(params)
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         setError(e.detail)
       } else if (e instanceof Error) {
         setError(e.message)
       } else {
-        setError('No fue posible descargar el archivo KML.')
+        setError('Could not download the KML file.')
       }
     } finally {
       setLoading(null)
@@ -33,12 +62,35 @@ export default function KmlDownloads() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={700} gutterBottom>
-        Descargas KML
+        KML downloads
       </Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Descarga tus escaneos por tecnología. Los archivos incluyen solo datos del usuario de la
-        sesión actual.
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Download your scans by technology. Files include only data for the current session user.
+        The API requires a date range (`first_seen_after` and `first_seen_before`) and normalizes
+        each bound to the full calendar day in the value&apos;s timezone. Very wide ranges may take
+        longer to generate.
       </Typography>
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems={{ sm: 'center' }}>
+        <TextField
+          label="From (range start)"
+          type="datetime-local"
+          value={afterLocal}
+          onChange={(e) => setAfterLocal(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ minWidth: 260 }}
+        />
+        <TextField
+          label="To (range end)"
+          type="datetime-local"
+          value={beforeLocal}
+          onChange={(e) => setBeforeLocal(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ minWidth: 260 }}
+        />
+      </Stack>
 
       {error && (
         <Alert sx={{ mb: 2 }} severity="error" onClose={() => setError(null)}>
@@ -49,11 +101,16 @@ export default function KmlDownloads() {
       <Stack spacing={2}>
         <Card variant="outlined">
           <CardContent>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'start', sm: 'center' }} justifyContent="space-between">
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'start', sm: 'center' }}
+              justifyContent="space-between"
+            >
               <Box>
-                <Typography variant="h6">Descargar KML WiFi</Typography>
+                <Typography variant="h6">Download WiFi KML</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Exporta los puntos WiFi con metadatos para visualización en Google Earth.
+                  Export WiFi points with metadata for Google Earth and similar tools.
                 </Typography>
               </Box>
               <Button
@@ -62,7 +119,7 @@ export default function KmlDownloads() {
                 disabled={loading !== null}
                 onClick={() => void handleDownload('wifi')}
               >
-                Descargar KML WiFi
+                Download WiFi KML
               </Button>
             </Stack>
           </CardContent>
@@ -70,11 +127,16 @@ export default function KmlDownloads() {
 
         <Card variant="outlined">
           <CardContent>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'start', sm: 'center' }} justifyContent="space-between">
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              alignItems={{ xs: 'start', sm: 'center' }}
+              justifyContent="space-between"
+            >
               <Box>
-                <Typography variant="h6">Descargar KML LTE</Typography>
+                <Typography variant="h6">Download LTE KML</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Exporta celdas LTE (provider, cell_id, banda y señal) con coordenadas válidas.
+                  Export LTE cells (provider, cell_id, band, signal) with valid coordinates.
                 </Typography>
               </Box>
               <Button
@@ -83,7 +145,7 @@ export default function KmlDownloads() {
                 disabled={loading !== null}
                 onClick={() => void handleDownload('lte')}
               >
-                Descargar KML LTE
+                Download LTE KML
               </Button>
             </Stack>
           </CardContent>

@@ -35,7 +35,7 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (form.password !== form.passwordConfirm) {
-      setError('Las contrasenas no coinciden')
+      setError('Passwords do not match')
       return
     }
     setError(null)
@@ -44,7 +44,7 @@ export default function Register() {
       await register(form.username.trim(), form.email.trim(), form.password, form.passwordConfirm)
       navigate('/', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Error al registrar usuario')
+      setError(err instanceof ApiError ? err.detail : 'Failed to register')
     } finally {
       setLoading(false)
     }
@@ -78,10 +78,10 @@ export default function Register() {
         <Stack alignItems="center" spacing={1} mb={3}>
           <WifiFindIcon color="primary" sx={{ fontSize: 40 }} />
           <Typography variant="h5" fontWeight={700}>
-            Crear cuenta
+            Create account
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Registrate en Wardrive
+            Join Wardrive
           </Typography>
         </Stack>
 
@@ -94,7 +94,7 @@ export default function Register() {
         <Box component="form" onSubmit={handleSubmit}>
           <Stack spacing={2}>
             <TextField
-              label="Usuario"
+              label="Username"
               value={form.username}
               onChange={set('username')}
               autoFocus
@@ -112,7 +112,7 @@ export default function Register() {
               disabled={loading}
             />
             <TextField
-              label="Contrasena"
+              label="Password"
               type="password"
               value={form.password}
               onChange={set('password')}
@@ -121,7 +121,7 @@ export default function Register() {
               disabled={loading}
             />
             <TextField
-              label="Confirmar contrasena"
+              label="Confirm password"
               type="password"
               value={form.passwordConfirm}
               onChange={set('passwordConfirm')}
@@ -131,7 +131,7 @@ export default function Register() {
               error={Boolean(form.passwordConfirm && form.password !== form.passwordConfirm)}
               helperText={
                 form.passwordConfirm && form.password !== form.passwordConfirm
-                  ? 'Las contrasenas no coinciden'
+                  ? 'Passwords do not match'
                   : undefined
               }
             />
@@ -143,7 +143,7 @@ export default function Register() {
               disabled={loading || !isValid}
               startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
             >
-              {loading ? 'Registrando...' : 'Crear cuenta'}
+              {loading ? 'Registering…' : 'Create account'}
             </Button>
           </Stack>
         </Box>
@@ -151,9 +151,9 @@ export default function Register() {
         <Divider sx={{ my: 3 }} />
 
         <Typography variant="body2" color="text.secondary" textAlign="center">
-          ¿Ya tienes cuenta?{' '}
+          Already have an account?{' '}
           <Link component={RouterLink} to="/login" underline="hover">
-            Inicia sesion
+            Sign in
           </Link>
         </Typography>
       </Paper>

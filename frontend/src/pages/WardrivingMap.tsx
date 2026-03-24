@@ -6,6 +6,7 @@ import {
   CircularProgress,
   Paper,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -15,16 +16,19 @@ import L from 'leaflet'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { useSearchParams } from 'react-router-dom'
 
+import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import {
   fetchLtePlaces,
   fetchWifiPlaces,
   type WardrivingPlace,
 } from '@/api/wardriveMap'
+import { datetimeLocalToIso, isoToDatetimeLocalValue } from '@/utils/datetimeLocal'
 
 import 'leaflet/dist/leaflet.css'
 
-/** Coincide con MapPlacesPagination en la API (hasta 2000 por petición). */
-const PAGE_SIZE = 1000
+/** Visible points per map “page” (4 × 250). */
+const VIEW_SIZE = 1000
+const BATCH_SIZE = 250
 
 const DEFAULT_CENTER: [number, number] = [40.4168, -3.7038]
 const DEFAULT_ZOOM = 6
@@ -81,7 +85,10 @@ export default function WardrivingMap() {
   const [searchParams, setSearchParams] = useSearchParams()
   const modeParam = searchParams.get('mode')
   const mode: 'wifi' | 'lte' = modeParam === 'lte' ? 'lte' : 'wifi'
-  const page = parsePageParam(searchParams.get('page')) // ?page=2 en la URL
+  const page = parsePageParam(searchParams.get('page'))
+
+  const first_seen_after = searchParams.get('first_seen_after') ?? ANALYTICS_DEFAULTS.startDate
+  const first_seen_before = searchParams.get('first_seen_before') ?? ANALYTICS_DEFAULTS.endDate
 
   const setPage = useCallback(
     (p: number) => {
@@ -89,6 +96,18 @@ export default function WardrivingMap() {
         const next = new URLSearchParams(prev)
         if (p <= 1) next.delete('page')
         else next.set('page', String(p))
+        return next
+      })
+    },
+    [setSearchParams],
+  )
+
+  const setDateField = useCallback(
+    (field: 'first_seen_after' | 'first_seen_before', local: string) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set(field, datetimeLocalToIso(local))
+        next.delete('page')
         return next
       })
     },
@@ -108,6 +127,16 @@ export default function WardrivingMap() {
     [setSearchParams],
   )
 
+  useEffect(() => {
+    setSearchParams((prev) => {
+      if (prev.has('first_seen_after') && prev.has('first_seen_before')) return prev
+      const next = new URLSearchParams(prev)
+      if (!next.has('first_seen_after')) next.set('first_seen_after', ANALYTICS_DEFAULTS.startDate)
+      if (!next.has('first_seen_before')) next.set('first_seen_before', ANALYTICS_DEFAULTS.endDate)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
   const [data, setData] = useState<WardrivingPlace[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -118,18 +147,54 @@ export default function WardrivingMap() {
     async function load() {
       setLoading(true)
       setError(null)
+      const baseSubPage = (page - 1) * 4 + 1
+      const params = {
+        first_seen_after,
+        first_seen_before,
+      }
       try {
-        const res =
-          mode === 'wifi'
-            ? await fetchWifiPlaces({ page, page_size: PAGE_SIZE })
-            : await fetchLtePlaces({ page, page_size: PAGE_SIZE })
-        if (!cancelled) {
-          setData(res.results)
-          setTotal(res.count)
+        const fetchFn = mode === 'wifi' ? fetchWifiPlaces : fetchLtePlaces
+
+        // First batch only — get total count, then request extra pages only if they exist.
+        // (DRF returns 404 for page > last page; parallel requests to empty pages break the UI.)
+        const first = await fetchFn({
+          page: baseSubPage,
+          page_size: BATCH_SIZE,
+          ...params,
+        })
+        if (cancelled) return
+
+        const totalCount = first.count
+        const startOffset = (baseSubPage - 1) * BATCH_SIZE
+        const itemsAvailable = Math.max(0, totalCount - startOffset)
+        const itemsToFetch = Math.min(VIEW_SIZE, itemsAvailable)
+        const numBatches = Math.min(
+          4,
+          itemsToFetch === 0 ? 0 : Math.ceil(itemsToFetch / BATCH_SIZE),
+        )
+
+        if (numBatches <= 1) {
+          setData(first.results)
+          setTotal(totalCount)
+          return
         }
+
+        const rest = await Promise.all(
+          Array.from({ length: numBatches - 1 }, (_, i) =>
+            fetchFn({
+              page: baseSubPage + 1 + i,
+              page_size: BATCH_SIZE,
+              ...params,
+            }),
+          ),
+        )
+        if (cancelled) return
+        const merged = [first, ...rest].flatMap((r) => r.results)
+        setData(merged)
+        setTotal(totalCount)
       } catch (e: unknown) {
         if (!cancelled) {
-          const msg = e instanceof Error ? e.message : 'Error al cargar datos'
+          const msg = e instanceof Error ? e.message : 'Failed to load data'
           setError(msg)
           setData([])
           setTotal(0)
@@ -142,13 +207,13 @@ export default function WardrivingMap() {
     return () => {
       cancelled = true
     }
-  }, [mode, page])
+  }, [mode, page, first_seen_after, first_seen_before])
 
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE) || 1)
+  const pageCount = Math.max(1, Math.ceil(total / VIEW_SIZE) || 1)
 
   useEffect(() => {
     if (total <= 0) return
-    const maxPage = Math.ceil(total / PAGE_SIZE)
+    const maxPage = Math.ceil(total / VIEW_SIZE)
     if (maxPage >= 1 && page > maxPage) setPage(maxPage)
   }, [total, page, setPage])
 
@@ -156,13 +221,35 @@ export default function WardrivingMap() {
     <Stack spacing={2} sx={{ height: '100%', minHeight: 480 }}>
       <Box>
         <Typography variant="h5" fontWeight={700} gutterBottom>
-          Mapa wardriving
+          Wardriving map
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Cada página muestra hasta {PAGE_SIZE} pines. Usa la barra encima del mapa (o la URL con{' '}
-          <code>?page=2</code>). Leyenda por intensidad de señal.
+          Each view loads up to {VIEW_SIZE} pins in batches of {BATCH_SIZE} (only as many requests as
+          needed — no empty pages). Date filters in the URL (<code>first_seen_after</code>,{' '}
+          <code>first_seen_before</code>). Legend by signal strength.
         </Typography>
       </Box>
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} flexWrap="wrap">
+        <TextField
+          label="From"
+          type="datetime-local"
+          value={isoToDatetimeLocalValue(first_seen_after)}
+          onChange={(e) => setDateField('first_seen_after', e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ minWidth: 240 }}
+        />
+        <TextField
+          label="To"
+          type="datetime-local"
+          value={isoToDatetimeLocalValue(first_seen_before)}
+          onChange={(e) => setDateField('first_seen_before', e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={{ minWidth: 240 }}
+        />
+      </Stack>
 
       <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
         <ToggleButtonGroup
@@ -170,7 +257,7 @@ export default function WardrivingMap() {
           exclusive
           onChange={handleModeChange}
           size="small"
-          aria-label="Modo de mapa"
+          aria-label="Map mode"
         >
           <ToggleButton value="wifi">WiFi</ToggleButton>
           <ToggleButton value="lte">LTE</ToggleButton>
@@ -179,7 +266,7 @@ export default function WardrivingMap() {
         {!loading && (
           <Chip
             size="small"
-            label={`${total} registros · página ${page} / ${pageCount}`}
+            label={`${total} records · view ${page} / ${pageCount}`}
             variant="outlined"
           />
         )}
@@ -199,8 +286,8 @@ export default function WardrivingMap() {
         }}
       >
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
-          Pines en el mapa: página <strong>{page}</strong> de <strong>{pageCount}</strong>
-          {total > 0 ? ` (${data.length} en pantalla)` : ''}
+          Pins on map: view <strong>{page}</strong> of <strong>{pageCount}</strong>
+          {total > 0 ? ` (${data.length} on screen)` : ''}
         </Typography>
         <Pagination
           count={pageCount}
@@ -245,7 +332,7 @@ export default function WardrivingMap() {
           <FitBounds places={data} />
           {data.map((p, i) => (
             <CircleMarker
-              key={`${p.mac}-${i}-${page}`}
+              key={`${mode}-${p.mac}-${i}-${page}`}
               center={[p.current_latitude, p.current_longitude]}
               radius={8}
               pathOptions={{
@@ -267,10 +354,10 @@ export default function WardrivingMap() {
                     <strong>SSID:</strong> {p.ssid || '—'}
                   </Typography>
                   <Typography variant="caption" component="div">
-                    <strong>Señal:</strong> {p.signal_streng}
+                    <strong>Signal:</strong> {p.signal_streng}
                   </Typography>
                   <Typography variant="caption" component="div">
-                    <strong>Tipo:</strong> {p.type} · <strong>Auth:</strong> {p.auth_mode || '—'}
+                    <strong>Type:</strong> {p.type} · <strong>Auth:</strong> {p.auth_mode || '—'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {p.device_source} · {p.uploaded_by || '—'}
@@ -284,7 +371,7 @@ export default function WardrivingMap() {
 
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
         <Typography variant="caption" color="text.secondary">
-          Leyenda:
+          Legend:
         </Typography>
         {['Excellent', 'Good', 'Fair', 'Weak'].map((s) => (
           <Chip

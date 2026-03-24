@@ -48,12 +48,12 @@ type NavItem =
     }
 
 const navItems: NavItem[] = [
-  { label: 'Inicio', path: '/', icon: <HomeIcon /> },
+  { label: 'Home', path: '/', icon: <HomeIcon /> },
   { label: 'Wardriving', path: '/map', mapMode: 'wifi', icon: <WifiFindIcon /> },
   { label: 'Wardriving LTE', path: '/map', mapMode: 'lte', icon: <CellTowerIcon /> },
   { label: 'Analytics', path: '/analytics', icon: <BarChartIcon /> },
   { label: 'Upload', path: '/upload', icon: <CloudUploadIcon /> },
-  { label: 'Descargas KML', path: '/downloads', icon: <DownloadIcon /> },
+  { label: 'KML downloads', path: '/downloads', icon: <DownloadIcon /> },
 ]
 
 interface LayoutProps {
@@ -119,7 +119,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
   const miniDrawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center' }}>
       <Toolbar sx={{ width: '100%', justifyContent: 'center', minHeight: '64px !important' }}>
-        <Tooltip title="Abrir menu" placement="right">
+        <Tooltip title="Open menu" placement="right">
           <IconButton onClick={handleDrawerToggle} size="small">
             <MenuIcon />
           </IconButton>
@@ -158,7 +158,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
       </List>
       <Divider sx={{ width: '100%' }} />
       <Box sx={{ py: 1.5, display: 'flex', justifyContent: 'center' }}>
-        <Tooltip title={user?.username ?? 'Usuario'} placement="right">
+        <Tooltip title={user?.username ?? 'User'} placement="right">
           <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 14 }}>
             {user?.username?.[0]?.toUpperCase() ?? 'U'}
           </Avatar>
@@ -185,7 +185,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
             Wardrive
           </Typography>
         </Box>
-        <Tooltip title="Colapsar menu">
+        <Tooltip title="Collapse menu">
           <IconButton onClick={handleDrawerToggle} size="small">
             <ChevronLeftIcon />
           </IconButton>
@@ -221,7 +221,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
         </Avatar>
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           <Typography variant="body2" fontWeight={600} noWrap>
-            {user?.username ?? 'Usuario'}
+            {user?.username ?? 'User'}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             wardrive-frontend v0.1.0
@@ -258,7 +258,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
         }}
       >
         <Toolbar>
-          {/* Hamburger: en mobile abre el drawer overlay; en desktop no aparece (el toggle esta en el drawer) */}
+          {/* Hamburger: on mobile opens overlay drawer; hidden on desktop (toggle lives in drawer) */}
           <IconButton
             edge="start"
             onClick={handleDrawerToggle}
@@ -269,12 +269,12 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
           <Typography variant="h6" noWrap sx={{ flexGrow: 1, fontWeight: 600 }}>
             Wardriving Contest Platform
           </Typography>
-          <Tooltip title={isDarkMode ? 'Modo claro' : 'Modo oscuro'}>
+          <Tooltip title={isDarkMode ? 'Light mode' : 'Dark mode'}>
             <IconButton onClick={onToggleTheme} color="inherit">
               {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
           </Tooltip>
-          <Tooltip title="Cerrar sesion">
+          <Tooltip title="Sign out">
             <IconButton onClick={handleLogout} color="inherit" sx={{ ml: 0.5 }}>
               <LogoutIcon />
             </IconButton>
@@ -282,7 +282,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
         </Toolbar>
       </AppBar>
 
-      {/* Drawer mobile (overlay temporal) */}
+      {/* Mobile drawer (temporary overlay) */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -296,7 +296,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
         {fullDrawerContent}
       </Drawer>
 
-      {/* Drawer desktop (persistent — se comprime a mini) */}
+      {/* Desktop drawer (persistent — collapses to mini) */}
       <Drawer
         variant="permanent"
         sx={{
@@ -318,7 +318,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
         {drawerOpen ? fullDrawerContent : miniDrawerContent}
       </Drawer>
 
-      {/* Contenido principal */}
+      {/* Main content */}
       <Box
         component="main"
         sx={{

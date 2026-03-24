@@ -36,7 +36,7 @@ export default function Login() {
       await login(username.trim(), password)
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Error al iniciar sesion')
+      setError(err instanceof ApiError ? err.detail : 'Failed to sign in')
     } finally {
       setLoading(false)
     }
@@ -70,7 +70,7 @@ export default function Login() {
             Wardrive
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Inicia sesion para continuar
+            Sign in to continue
           </Typography>
         </Stack>
 
@@ -83,7 +83,7 @@ export default function Login() {
         <Box component="form" onSubmit={handleSubmit}>
           <Stack spacing={2}>
             <TextField
-              label="Usuario"
+              label="Username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
@@ -92,7 +92,7 @@ export default function Login() {
               disabled={loading}
             />
             <TextField
-              label="Contrasena"
+              label="Password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -108,7 +108,7 @@ export default function Login() {
               disabled={loading || !username.trim() || !password}
               startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
             >
-              {loading ? 'Iniciando...' : 'Iniciar sesion'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </Button>
           </Stack>
         </Box>
@@ -116,9 +116,9 @@ export default function Login() {
         <Divider sx={{ my: 3 }} />
 
         <Typography variant="body2" color="text.secondary" textAlign="center">
-          ¿No tienes cuenta?{' '}
+          Don&apos;t have an account?{' '}
           <Link component={RouterLink} to="/register" underline="hover">
-            Registrate
+            Register
           </Link>
         </Typography>
       </Paper>

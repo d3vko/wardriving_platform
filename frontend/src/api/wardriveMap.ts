@@ -23,11 +23,11 @@ export type PaginatedPlaces = {
 export type PlacesListParams = {
   page?: number
   page_size?: number
-  /** Contiene (icontains) en uploaded_by */
+  /** Case-insensitive substring match on uploaded_by */
   uploaded_by?: string
-  /** ISO 8601: first_seen >= */
+  /** ISO 8601: first_seen >= (normalized server-side) */
   first_seen_after?: string
-  /** ISO 8601: first_seen <= */
+  /** ISO 8601: first_seen <= (normalized server-side) */
   first_seen_before?: string
 }
 
@@ -55,8 +55,18 @@ export function fetchLtePlaces(params: PlacesListParams): Promise<PaginatedPlace
 
 type KmlKind = 'wifi' | 'lte'
 
-function kmlPath(kind: KmlKind): string {
-  return kind === 'wifi' ? '/wardrive/wifi/kml/' : '/wardrive/lte/kml/'
+/** Required query params for KML export (the API returns 400 if either is missing). */
+export type KmlDownloadParams = {
+  first_seen_after: string
+  first_seen_before: string
+}
+
+function kmlPath(kind: KmlKind, params: KmlDownloadParams): string {
+  const base = kind === 'wifi' ? '/wardrive/wifi/kml/' : '/wardrive/lte/kml/'
+  const sp = new URLSearchParams()
+  sp.set('first_seen_after', params.first_seen_after)
+  sp.set('first_seen_before', params.first_seen_before)
+  return `${base}?${sp.toString()}`
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -70,12 +80,12 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export async function downloadWifiKml(): Promise<void> {
-  const blob = await apiFetchBlob(kmlPath('wifi'), { method: 'GET' })
+export async function downloadWifiKml(params: KmlDownloadParams): Promise<void> {
+  const blob = await apiFetchBlob(kmlPath('wifi', params), { method: 'GET' })
   downloadBlob(blob, 'wifi_scans.kml')
 }
 
-export async function downloadLteKml(): Promise<void> {
-  const blob = await apiFetchBlob(kmlPath('lte'), { method: 'GET' })
+export async function downloadLteKml(params: KmlDownloadParams): Promise<void> {
+  const blob = await apiFetchBlob(kmlPath('lte', params), { method: 'GET' })
   downloadBlob(blob, 'lte_scans.kml')
 }

@@ -77,8 +77,8 @@ export default function Upload() {
   }
 
   const handleSubmit = async () => {
-    if (!deviceSource) { setFieldError('Selecciona un tipo de dispositivo'); return }
-    if (files.length === 0) { setFieldError('Agrega al menos un archivo'); return }
+    if (!deviceSource) { setFieldError('Select a device type'); return }
+    if (files.length === 0) { setFieldError('Add at least one file'); return }
     setFieldError(null)
     setLoading(true)
     setResults(null)
@@ -90,9 +90,9 @@ export default function Upload() {
       }))
       setResults(res)
       setFiles([])
-      setSnackbar({ open: true, message: `${uploaded.length} archivo(s) subido(s) correctamente`, severity: 'success' })
+      setSnackbar({ open: true, message: `${uploaded.length} file(s) uploaded successfully`, severity: 'success' })
     } catch (err) {
-      const msg = err instanceof ApiError ? err.detail : 'Error al subir archivos'
+      const msg = err instanceof ApiError ? err.detail : 'Failed to upload files'
       setSnackbar({ open: true, message: msg, severity: 'error' })
     } finally {
       setLoading(false)
@@ -104,20 +104,20 @@ export default function Upload() {
       <Stack direction="row" alignItems="center" spacing={1.5} mb={1}>
         <CloudUploadIcon color="primary" sx={{ fontSize: 32 }} />
         <Typography variant="h4" fontWeight={700}>
-          Subir archivos
+          Upload files
         </Typography>
       </Stack>
       <Typography variant="body1" color="text.secondary" mb={4}>
-        Sube archivos de captura de wardriving. Se aceptan multiples archivos simultaneamente.
+        Upload wardriving capture logs. Multiple files are accepted at once.
       </Typography>
 
       <Stack spacing={3} maxWidth={640}>
         {/* Device source selector */}
         <FormControl fullWidth error={Boolean(fieldError && !deviceSource)}>
-          <InputLabel>Tipo de dispositivo</InputLabel>
+          <InputLabel>Device type</InputLabel>
           <Select
             value={deviceSource}
-            label="Tipo de dispositivo"
+            label="Device type"
             onChange={(e) => setDeviceSource(e.target.value)}
             disabled={loading}
           >
@@ -157,10 +157,10 @@ export default function Upload() {
           />
           <CloudUploadIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
           <Typography variant="body1" fontWeight={500}>
-            Arrastra archivos aqui o haz click para seleccionar
+            Drag files here or click to browse
           </Typography>
           <Typography variant="body2" color="text.secondary" mt={0.5}>
-            Puedes seleccionar multiples archivos
+            You can select multiple files
           </Typography>
         </Box>
 
@@ -169,7 +169,7 @@ export default function Upload() {
           <Card>
             <CardContent sx={{ pb: '12px !important' }}>
               <Typography variant="subtitle2" fontWeight={600} mb={1.5}>
-                Archivos seleccionados ({files.length})
+                Selected files ({files.length})
               </Typography>
               <Stack spacing={1}>
                 {files.map((f, i) => (
@@ -205,7 +205,7 @@ export default function Upload() {
               <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
                 <CheckCircleIcon color="success" />
                 <Typography variant="subtitle2" fontWeight={600}>
-                  Resultado del upload
+                  Upload result
                 </Typography>
               </Stack>
               <Stack spacing={0.5}>
@@ -230,7 +230,7 @@ export default function Upload() {
           startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <CloudUploadIcon />}
           sx={{ alignSelf: 'flex-start' }}
         >
-          {loading ? 'Subiendo...' : `Subir ${files.length > 0 ? `(${files.length})` : ''}`}
+          {loading ? 'Uploading…' : `Upload ${files.length > 0 ? `(${files.length})` : ''}`}
         </Button>
       </Stack>
 

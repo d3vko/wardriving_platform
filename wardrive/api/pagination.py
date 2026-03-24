@@ -18,8 +18,8 @@ class CustomPagination(pagination.PageNumberPagination):
 
 class MapPlacesPagination(pagination.PageNumberPagination):
     """
-    Paginación para listados de puntos en mapa (WiFi/LTE).
-    Permite pedir muchos marcadores por página sin afectar al resto de la API.
+    Pagination for map point listings (WiFi/LTE).
+    Allows large page sizes without changing defaults for the rest of the API.
     """
 
     page_size = 1000

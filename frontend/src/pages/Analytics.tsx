@@ -204,7 +204,7 @@ function DetailTable({
   if (rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
-        Sin registros para el periodo seleccionado.
+        No records for the selected period.
       </Typography>
     )
   }
@@ -321,7 +321,7 @@ export default function Analytics() {
         <Typography variant="h4" fontWeight={700}>
           Analytics
         </Typography>
-        <Tooltip title="Recargar datos">
+        <Tooltip title="Reload data">
           <IconButton onClick={() => void load()} disabled={state.loading} size="small">
             <RefreshIcon />
           </IconButton>
@@ -334,16 +334,16 @@ export default function Analytics() {
         onChange={(_, v: 0 | 1) => setTab(v)}
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Tab label={`Mis datos${user?.username ? ` (${user.username})` : ''}`} />
+        <Tab label={`My data${user?.username ? ` (${user.username})` : ''}`} />
         <Tab label="Global" />
       </Tabs>
 
-      {/* Filtros de fecha */}
+      {/* Date filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-end">
             <TextField
-              label="Desde"
+              label="From"
               type="datetime-local"
               value={startDate.slice(0, 16)}
               onChange={(e) => setStartDate(e.target.value + ':00-06:00')}
@@ -352,7 +352,7 @@ export default function Analytics() {
               sx={{ minWidth: 220 }}
             />
             <TextField
-              label="Hasta"
+              label="To"
               type="datetime-local"
               value={endDate.slice(0, 16)}
               onChange={(e) => setEndDate(e.target.value + ':00-06:00')}
@@ -362,7 +362,7 @@ export default function Analytics() {
             />
             {tab === 0 && user?.username && (
               <Typography variant="body2" color="text.secondary">
-                Filtrando por usuario: <strong>{user.username}</strong>
+                Filtered by user: <strong>{user.username}</strong>
               </Typography>
             )}
           </Stack>
@@ -373,7 +373,7 @@ export default function Analytics() {
       <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <PieChartCard
-            title="Modos de Autenticación"
+            title="Authentication modes"
             data={state.authModes}
             loading={state.loading}
             error={state.errors.authModes ?? null}
@@ -381,7 +381,7 @@ export default function Analytics() {
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <PieChartCard
-            title="Dispositivos"
+            title="Devices"
             data={state.byDevice}
             loading={state.loading}
             error={state.errors.byDevice ?? null}
@@ -389,7 +389,7 @@ export default function Analytics() {
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <PieChartCard
-            title="Intensidad de Señal"
+            title="Signal strength"
             data={state.bySignal}
             loading={state.loading}
             error={state.errors.bySignal ?? null}
@@ -398,7 +398,7 @@ export default function Analytics() {
         {tab === 1 ? (
           <Grid item xs={12} sm={6} md={3}>
             <PieChartCard
-              title="Contribuidores"
+              title="Contributors"
               data={state.byAuthor}
               loading={state.loading}
               error={state.errors.byAuthor ?? null}
@@ -407,7 +407,7 @@ export default function Analytics() {
         ) : (
           <Grid item xs={12} sm={6} md={3}>
             <PieChartCard
-              title="Fabricantes"
+              title="Vendors"
               data={state.byVendor}
               loading={state.loading}
               error={state.errors.byVendor ?? null}
@@ -419,34 +419,34 @@ export default function Analytics() {
       {/* BarChart de auth modes */}
       <Box mb={3}>
         <BarChartCard
-          title="Modos de Autenticación — Barras"
+          title="Authentication modes — bars"
           data={state.authModes}
-          xLabel="Modo"
-          yLabel="Cantidad"
+          xLabel="Mode"
+          yLabel="Count"
           loading={state.loading}
           error={state.errors.authModes ?? null}
         />
       </Box>
 
-      {/* BarChart de fabricantes (solo en global se separa en pie, aqui siempre visible) */}
+      {/* Vendor bar chart (global tab) */}
       {tab === 1 && (
         <Box mb={3}>
           <BarChartCard
-            title="Top Fabricantes"
+            title="Top vendors"
             data={state.byVendor.slice(0, 15)}
-            xLabel="Fabricante"
-            yLabel="Cantidad"
+            xLabel="Vendor"
+            yLabel="Count"
             loading={state.loading}
             error={state.errors.byVendor ?? null}
           />
         </Box>
       )}
 
-      {/* Tabla de detalle */}
+      {/* Detail table */}
       <Card>
         <CardHeader
-          title="Detalle de registros"
-          subheader="Máximo 150 filas (consulta limitada en el servidor)"
+          title="Record detail"
+          subheader="At most 150 rows (server-limited query)"
           titleTypographyProps={{ variant: 'h6', fontWeight: 600 }}
         />
         <CardContent sx={{ pt: 0 }}>

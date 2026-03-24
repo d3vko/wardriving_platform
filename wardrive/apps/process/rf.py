@@ -128,7 +128,7 @@ def _strip_column_names(df: DataFrame) -> None:
 
 
 def _rf_wifi_csv_has_core_columns(df: DataFrame) -> bool:
-    """True si el DataFrame parece un export WiFi LilyGo / inglés / Minino."""
+    """True if the DataFrame looks like a LilyGo WiFi export / English / Minino."""
     if df is None or df.empty:
         return True
     tmp = df.copy()

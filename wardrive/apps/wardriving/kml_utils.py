@@ -30,17 +30,17 @@ def build_kml_response(
     extra_fn,
 ) -> HttpResponse:
     """
-    Genera y descarga KML desde un queryset.
+    Build and return a KML download from a queryset.
 
-    Cada callable recibe `obj` y devuelve:
-    - name_fn -> str para el nombre del pin
-    - lat_fn/lon_fn -> coordenadas
-    - extra_fn -> dict con metadatos para tabla/extended data
+    Each callable receives `obj` and returns:
+    - name_fn -> str for the placemark name
+    - lat_fn/lon_fn -> coordinates
+    - extra_fn -> dict of metadata for table/extended data
     """
     kml = simplekml.Kml()
     icon_href = "https://raw.githubusercontent.com/AdrianPardo99/flipper_zero_anims_assets/refs/heads/hide/Ultra-hide-branch/misc_icons/kml_icon-v2_wo_back.png"
 
-    for obj in queryset:
+    for obj in queryset.iterator(chunk_size=2000):
         lat = float(lat_fn(obj))
         lon = float(lon_fn(obj))
         extra_data = extra_fn(obj) or {}
