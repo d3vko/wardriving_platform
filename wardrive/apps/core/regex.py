@@ -8,12 +8,13 @@ import re
 # -----------------------------
 
 # Flipper/Marauder WiFi format with index and auth_mode in brackets
+# Timestamp may be empty (,,) on some firmware exports (v1 / Untitled-2 style).
 LINE_RE_FLIPPER_WIFI = re.compile(
     r"^(?:>?\s*)?\d+\s*\|\s*"  # "1 |" with optional leading ">"
     r"([0-9A-Fa-f:]+),\s*"  # MAC/BSSID
     r"([^,]*),\s*"  # SSID
     r"\[([^\]]*)\],\s*"  # auth_mode
-    r"(\d{4}-\d{1,2}-\d{1,2} \d{2}:\d{2}:\d{2}),\s*"  # timestamp
+    r"((?:\d{4}-\d{1,2}-\d{1,2} \d{2}:\d{2}:\d{2})?)\s*,\s*"  # timestamp (optional)
     r"(\d+),\s*"  # channel
     r"(-?\d+),\s*"  # rssi
     r"(-?\d+(?:\.\d+)?),\s*"  # lat

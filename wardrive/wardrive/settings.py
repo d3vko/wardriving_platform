@@ -123,7 +123,6 @@ _script = f"{FORCE_SCRIPT_NAME}/" if FORCE_SCRIPT_NAME else ""
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 # Ruta custom para no chocar con MinIO Console (que usa /static/ y /styles/)
 STATIC_URL = env("STATIC_URL", default=f"{_script}static-wardrive/")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media: from env or default; when using S3, MEDIA_URL is typically /media/ (served by nginx proxy to MinIO)
 MEDIA_URL = env("MEDIA_URL", default=f"{_script}media/")
