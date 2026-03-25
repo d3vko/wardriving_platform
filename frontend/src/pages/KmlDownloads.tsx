@@ -15,28 +15,30 @@ import DownloadIcon from '@mui/icons-material/Download'
 import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import { ApiError } from '@/api/client'
 import { downloadLteKml, downloadWifiKml } from '@/api/wardriveMap'
-import { datetimeLocalToIso, isoToDatetimeLocalValue } from '@/utils/datetimeLocal'
+import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
 
 type DownloadKind = 'wifi' | 'lte' | null
 
 export default function KmlDownloads() {
   const [loading, setLoading] = useState<DownloadKind>(null)
   const [error, setError] = useState<string | null>(null)
-  const [afterLocal, setAfterLocal] = useState(() =>
-    isoToDatetimeLocalValue(ANALYTICS_DEFAULTS.startDate),
-  )
-  const [beforeLocal, setBeforeLocal] = useState(() =>
-    isoToDatetimeLocalValue(ANALYTICS_DEFAULTS.endDate),
-  )
+  const [afterDate, setAfterDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.startDate))
+  const [beforeDate, setBeforeDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.endDate))
 
   const handleDownload = async (kind: Exclude<DownloadKind, null>) => {
     setError(null)
-    if (!afterLocal || !beforeLocal) {
-      setError('Set both start and end of the range (date and time).')
+    if (!afterDate || !beforeDate) {
+      setError('Set both start and end dates of the range.')
       return
     }
-    const first_seen_after = datetimeLocalToIso(afterLocal)
-    const first_seen_before = datetimeLocalToIso(beforeLocal)
+    const range = dateInputToDayRangeIso(afterDate, beforeDate, {
+      minIso: ANALYTICS_DEFAULTS.minDate,
+      maxIso: ANALYTICS_DEFAULTS.maxDate,
+    })
+    setAfterDate(range.fromDate)
+    setBeforeDate(range.toDate)
+    const first_seen_after = range.startIso
+    const first_seen_before = range.endIso
     if (new Date(first_seen_after) > new Date(first_seen_before)) {
       setError('The start of the range must be before or equal to the end.')
       return
@@ -74,21 +76,29 @@ export default function KmlDownloads() {
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems={{ sm: 'center' }}>
         <TextField
           label="From (range start)"
-          type="datetime-local"
-          value={afterLocal}
-          onChange={(e) => setAfterLocal(e.target.value)}
+          type="date"
+          value={afterDate}
+          onChange={(e) => setAfterDate(e.target.value)}
           InputLabelProps={{ shrink: true }}
           size="small"
           sx={{ minWidth: 260 }}
+          inputProps={{
+            min: isoToDateInputValue(ANALYTICS_DEFAULTS.minDate),
+            max: isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate),
+          }}
         />
         <TextField
           label="To (range end)"
-          type="datetime-local"
-          value={beforeLocal}
-          onChange={(e) => setBeforeLocal(e.target.value)}
+          type="date"
+          value={beforeDate}
+          onChange={(e) => setBeforeDate(e.target.value)}
           InputLabelProps={{ shrink: true }}
           size="small"
           sx={{ minWidth: 260 }}
+          inputProps={{
+            min: isoToDateInputValue(ANALYTICS_DEFAULTS.minDate),
+            max: isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate),
+          }}
         />
       </Stack>
 

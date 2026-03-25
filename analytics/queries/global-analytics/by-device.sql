@@ -8,7 +8,8 @@ SELECT
     COUNT(*) AS qty_device
 FROM wardriving_vendor
 WHERE
-    first_seen BETWEEN { first_seen_start }::timestamptz AND { first_seen_end }::timestamptz
+    (first_seen at time zone 'America/Mexico_City') BETWEEN ({ first_seen_start }::timestamptz at time zone 'America/Mexico_City')
+                                                     AND ({ first_seen_end }::timestamptz at time zone 'America/Mexico_City')
 
 GROUP BY device_source
 ORDER BY qty_device DESC;

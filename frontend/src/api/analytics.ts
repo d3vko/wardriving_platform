@@ -8,6 +8,14 @@ export const ANALYTICS_DEFAULTS = {
     import.meta.env.VITE_ANALYTICS_DEFAULT_START_DATE || '2025-01-01T00:00:00-06:00',
   endDate:
     import.meta.env.VITE_ANALYTICS_DEFAULT_END_DATE || '2026-05-30T00:00:00-06:00',
+  minDate:
+    import.meta.env.VITE_ANALYTICS_MIN_DATE ||
+    import.meta.env.VITE_ANALYTICS_DEFAULT_START_DATE ||
+    '2025-01-01T00:00:00-06:00',
+  maxDate:
+    import.meta.env.VITE_ANALYTICS_MAX_DATE ||
+    import.meta.env.VITE_ANALYTICS_DEFAULT_END_DATE ||
+    '2026-05-30T00:00:00-06:00',
 }
 
 export type AnalyticsScope = 'self-analytics' | 'global-analytics'

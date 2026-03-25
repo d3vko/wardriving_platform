@@ -4,9 +4,8 @@ import {
   Box,
   Chip,
   CircularProgress,
-  Paper,
   Stack,
-  TextField,
+  Paper,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
@@ -22,7 +21,11 @@ import {
   fetchWifiPlaces,
   type WardrivingPlace,
 } from '@/api/wardriveMap'
-import { datetimeLocalToIso, isoToDatetimeLocalValue } from '@/utils/datetimeLocal'
+import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 
 import 'leaflet/dist/leaflet.css'
 
@@ -102,11 +105,16 @@ export default function WardrivingMap() {
     [setSearchParams],
   )
 
-  const setDateField = useCallback(
-    (field: 'first_seen_after' | 'first_seen_before', local: string) => {
+  const setDateRange = useCallback(
+    (nextFromDate: string, nextToDate: string) => {
+      const range = dateInputToDayRangeIso(nextFromDate, nextToDate, {
+        minIso: ANALYTICS_DEFAULTS.minDate,
+        maxIso: ANALYTICS_DEFAULTS.maxDate,
+      })
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev)
-        next.set(field, datetimeLocalToIso(local))
+        next.set('first_seen_after', range.startIso)
+        next.set('first_seen_before', range.endIso)
         next.delete('page')
         return next
       })
@@ -128,14 +136,22 @@ export default function WardrivingMap() {
   )
 
   useEffect(() => {
+    const fromInput = isoToDateInputValue(first_seen_after) || isoToDateInputValue(ANALYTICS_DEFAULTS.startDate)
+    const toInput = isoToDateInputValue(first_seen_before) || isoToDateInputValue(ANALYTICS_DEFAULTS.endDate)
+    const normalized = dateInputToDayRangeIso(fromInput, toInput, {
+      minIso: ANALYTICS_DEFAULTS.minDate,
+      maxIso: ANALYTICS_DEFAULTS.maxDate,
+    })
     setSearchParams((prev) => {
-      if (prev.has('first_seen_after') && prev.has('first_seen_before')) return prev
       const next = new URLSearchParams(prev)
-      if (!next.has('first_seen_after')) next.set('first_seen_after', ANALYTICS_DEFAULTS.startDate)
-      if (!next.has('first_seen_before')) next.set('first_seen_before', ANALYTICS_DEFAULTS.endDate)
+      if (next.get('first_seen_after') === normalized.startIso && next.get('first_seen_before') === normalized.endIso) {
+        return prev
+      }
+      next.set('first_seen_after', normalized.startIso)
+      next.set('first_seen_before', normalized.endIso)
       return next
     }, { replace: true })
-  }, [setSearchParams])
+  }, [first_seen_after, first_seen_before, setSearchParams])
 
   const [data, setData] = useState<WardrivingPlace[]>([])
   const [total, setTotal] = useState(0)
@@ -231,24 +247,36 @@ export default function WardrivingMap() {
       </Box>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} flexWrap="wrap">
-        <TextField
-          label="From"
-          type="datetime-local"
-          value={isoToDatetimeLocalValue(first_seen_after)}
-          onChange={(e) => setDateField('first_seen_after', e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ minWidth: 240 }}
-        />
-        <TextField
-          label="To"
-          type="datetime-local"
-          value={isoToDatetimeLocalValue(first_seen_before)}
-          onChange={(e) => setDateField('first_seen_before', e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ minWidth: 240 }}
-        />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} flexWrap="wrap">
+            <DatePicker
+              label="From"
+              value={dayjs(isoToDateInputValue(first_seen_after))}
+              minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+              maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+              onChange={(value: Dayjs | null) => {
+                if (!value || !value.isValid()) return
+                setDateRange(value.format('YYYY-MM-DD'), isoToDateInputValue(first_seen_before))
+              }}
+              slotProps={{
+                textField: { size: 'small', sx: { minWidth: 240 } },
+              }}
+            />
+            <DatePicker
+              label="To"
+              value={dayjs(isoToDateInputValue(first_seen_before))}
+              minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+              maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+              onChange={(value: Dayjs | null) => {
+                if (!value || !value.isValid()) return
+                setDateRange(isoToDateInputValue(first_seen_after), value.format('YYYY-MM-DD'))
+              }}
+              slotProps={{
+                textField: { size: 'small', sx: { minWidth: 240 } },
+              }}
+            />
+          </Stack>
+        </LocalizationProvider>
       </Stack>
 
       <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">

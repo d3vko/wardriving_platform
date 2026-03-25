@@ -10,11 +10,11 @@
       <Row class="gap-4 items-end flex-wrap">
         <Column>
           <Text.H5 class="font-medium mb-1">Desde</Text.H5>
-          <DatePicker param="first_seen_start" value="2025-01-01T00:00:00-06:00" />
+          <DatePicker param="first_seen_start" value="2025-01-01" />
         </Column>
         <Column>
           <Text.H5 class="font-medium mb-1">Hasta</Text.H5>
-          <DatePicker param="first_seen_end" value="2026-05-30T00:00:00-06:00" />
+          <DatePicker param="first_seen_end" value="2026-05-30" />
         </Column>
         <Column>
           <Text.H5 class="font-medium mb-1">Usuario (uploaded_by)</Text.H5>
@@ -25,17 +25,19 @@
     </Card.Content>
   </Card.Root>
 
-  <!-- Fila de PieCharts -->
+  <!-- Fila de BarCharts -->
   <Row class="gap-6 flex-wrap">
 
     <Card.Root class="flex-1 min-w-[280px]">
       <Card.Content class="p-6">
-        <PieChart
+        <BarChart
           query="self-analytics/auth-modes"
           title="Modos de Autenticación"
           description="Distribución de auth_mode"
-          nameCol="auth_mode"
-          valueCol="qty_auth"
+          x="auth_mode"
+          y="qty_auth"
+          xTitle="Modo"
+          yTitle="Cantidad"
           opts={{ reactToParams: 500 }}
         />
       </Card.Content>
@@ -43,12 +45,14 @@
 
     <Card.Root class="flex-1 min-w-[280px]">
       <Card.Content class="p-6">
-        <PieChart
+        <BarChart
           query="self-analytics/by-device"
           title="Dispositivos"
           description="Distribución por device_source"
-          nameCol="device_source"
-          valueCol="qty_device"
+          x="device_source"
+          y="qty_device"
+          xTitle="Dispositivo"
+          yTitle="Cantidad"
           opts={{ reactToParams: 500 }}
         />
       </Card.Content>
@@ -56,12 +60,14 @@
 
     <Card.Root class="flex-1 min-w-[280px]">
       <Card.Content class="p-6">
-        <PieChart
+        <BarChart
           query="self-analytics/by-signal"
           title="Intensidad de Señal"
           description="Distribución por signal_streng"
-          nameCol="signal_streng"
-          valueCol="qty_by_signal"
+          x="signal_streng"
+          y="qty_by_signal"
+          xTitle="Señal"
+          yTitle="Cantidad"
           opts={{ reactToParams: 500 }}
         />
       </Card.Content>
@@ -69,12 +75,14 @@
 
     <Card.Root class="flex-1 min-w-[280px]">
       <Card.Content class="p-6">
-        <PieChart
+        <BarChart
           query="self-analytics/by-vendor"
           title="Fabricantes"
           description="Top fabricantes detectados"
-          nameCol="vendor"
-          valueCol="qty_by_vendor"
+          x="vendor"
+          y="qty_by_vendor"
+          xTitle="Fabricante"
+          yTitle="Cantidad"
           opts={{ reactToParams: 500 }}
         />
       </Card.Content>
