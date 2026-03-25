@@ -2,7 +2,9 @@
 Marauder / Flipper / ESP32 Marauder firmware file processors.
 Supports Flipper format (WiFi, BLE, mixed) and classic CSV format.
 """
+import logging
 import re
+import time
 
 from apps.core.regex import (
     LINE_RE_CLASSIC_MARAUDER,
@@ -18,6 +20,8 @@ from apps.files.utils import (
     wardriving_better_obj_fn,
 )
 from apps.wardriving.models import Wardriving, SourceDevice
+
+logger = logging.getLogger(__name__)
 
 # Header fingerprints (line ~2 in common exports): v2 uses typo without space; v1 uses two words.
 _HEADER_CLASSIC_V2 = "StartingWardrive"
@@ -263,6 +267,7 @@ def _process_format_flipper_marauder_core(
     parser_fn(line) -> None | (mac, ssid_or_name, auth_mode, first_seen, channel, rssi,
                               lat, lon, alt, acc, data_type)
     """
+    t_parse0 = time.perf_counter()
     rows = []
 
     for line in lines:
@@ -320,6 +325,15 @@ def _process_format_flipper_marauder_core(
         row = {k: v for k, v in row.items() if v is not None}
         rows.append(row)
 
+    t_parse1 = time.perf_counter()
+    if logger.isEnabledFor(logging.INFO):
+        logger.info(
+            "marauder_core parse=%.3fs lines_in=%d rows_out=%d",
+            t_parse1 - t_parse0,
+            len(lines),
+            len(rows),
+        )
+
     return bulk_upsert_by_keys(
         model=Wardriving,
         key_fields=["uploaded_by", "mac", "channel"],
@@ -339,6 +353,7 @@ def _process_format_flipper_marauder_core(
         ],
         only_fields=["id", "uploaded_by", "mac", "channel", "rssi"],
         chunk_size=1000,
+        log_label="marauder",
     )
 
 

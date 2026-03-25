@@ -258,6 +258,20 @@ Upload logs through DRF:
 }
 ```
 
+## Flipper Zero / Marauder ESP32 logs
+
+Uploads processed by `process_file_marauder_esp32` (Flipper Dev Board, Flipper Dev Board Pro, Kiisu board, and classic Marauder hardware via other `device_source` values) support **automatic format detection**:
+
+- **Classic CSV (often with header `StartingWardrive. Stop with stopscan`)** — lines look like `MAC,SSID,[auth],timestamp,channel,rssi,lat,lon,alt,acc,WIFI|BLE` without a leading `N |` index. WiFi and BLE use the same pattern; a `Device:`-prefixed BLE line with the MAC glued to the label is handled when needed.
+- **Indexed Flipper lines (often with header `Starting Wardrive. Stop with stopscan`)** — lines start with `N |` (optional leading `>`); WiFi may omit an inline timestamp (`...[auth],,channel,...`). The processor tries BLE, indexed WiFi, V3 WiFi, then classic CSV as a fallback.
+
+You do not need separate uploads per format: **`process_format_flipper_marauder_v2`** picks the strategy from the preamble and/or the first data lines.
+
+### Celery queues and large log processing
+
+- **`CELERY_SHARDS`** (default `2` in code; set in `.env`) defines how many RabbitMQ queues exist (`proc_0` … `proc_{N-1}`). **Run at least one worker per queue** you define: e.g. `docker-compose.yml` ships `celery_proc_0` and `celery_proc_1` listening on `proc_0` and `proc_1`, so keep `CELERY_SHARDS=2` unless you add more worker services.
+- File ingestion runs in `apps.files.tasks.process_file`. Large Marauder logs spend time in **line parsing** and **bulk upsert** to PostgreSQL. At **INFO**, logs include `marauder_core parse=…` and `bulk_upsert_by_keys` timings (dedupe, select, classify, write) to compare bottlenecks. Upserts use **row-`IN`** lookups on PostgreSQL and a **partial index** (`wardriving_up_mac_ch_alv` on `uploaded_by`, `mac`, `channel` for non-deleted rows); writes are split into **transactions of up to 5000 keys** by default to shorten lock duration.
+
 ------------------------------------------------------------------------
 
 # 🗺️ KML Downloads (WiFi / LTE)

@@ -319,7 +319,7 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "America/Mexico_City"
 CELERY_ENABLE_UTC = False
 # --- Sharding by (uploaded_by, device_source) ---
-CELERY_SHARDS = int(os.getenv("CELERY_SHARDS", "4"))
+CELERY_SHARDS = int(os.getenv("CELERY_SHARDS", "2"))
 CELERY_TASK_DEFAULT_QUEUE = "proc_0"
 QUEUE_ARGS = {"x-max-priority": 10}
 

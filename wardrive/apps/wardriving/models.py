@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.utils.timezone import now
 
 from decimal import Decimal, InvalidOperation
@@ -37,6 +38,13 @@ class Wardriving(WardriveBaseModel):
         db_table = "wardriving"
         verbose_name = "Wardriving Data"
         verbose_name_plural = "Wardriving Data"
+        indexes = [
+            models.Index(
+                fields=["uploaded_by", "mac", "channel"],
+                name="wardriving_up_mac_ch_alv",
+                condition=Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self):
         device = self.ssid or self.type or "Unknown Device"
