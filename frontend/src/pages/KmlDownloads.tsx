@@ -7,7 +7,6 @@ import {
   CardContent,
   CircularProgress,
   Stack,
-  TextField,
   Typography,
 } from '@mui/material'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -16,6 +15,10 @@ import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import { ApiError } from '@/api/client'
 import { downloadLteKml, downloadWifiKml } from '@/api/wardriveMap'
 import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 
 type DownloadKind = 'wifi' | 'lte' | null
 
@@ -73,34 +76,46 @@ export default function KmlDownloads() {
         longer to generate.
       </Typography>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }} alignItems={{ sm: 'center' }}>
-        <TextField
-          label="From (range start)"
-          type="date"
-          value={afterDate}
-          onChange={(e) => setAfterDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ minWidth: 260 }}
-          inputProps={{
-            min: isoToDateInputValue(ANALYTICS_DEFAULTS.minDate),
-            max: isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate),
-          }}
-        />
-        <TextField
-          label="To (range end)"
-          type="date"
-          value={beforeDate}
-          onChange={(e) => setBeforeDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          size="small"
-          sx={{ minWidth: 260 }}
-          inputProps={{
-            min: isoToDateInputValue(ANALYTICS_DEFAULTS.minDate),
-            max: isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate),
-          }}
-        />
-      </Stack>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Date range for export
+          </Typography>
+        </Stack>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{ mb: 3 }}
+          alignItems={{ sm: 'center' }}
+        >
+          <DatePicker
+            label="From (range start)"
+            value={dayjs(afterDate)}
+            minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+            maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+            onChange={(value: Dayjs | null) => {
+              if (!value || !value.isValid()) return
+              setAfterDate(value.format('YYYY-MM-DD'))
+            }}
+            slotProps={{
+              textField: { size: 'small', sx: { minWidth: 260 } },
+            }}
+          />
+          <DatePicker
+            label="To (range end)"
+            value={dayjs(beforeDate)}
+            minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+            maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+            onChange={(value: Dayjs | null) => {
+              if (!value || !value.isValid()) return
+              setBeforeDate(value.format('YYYY-MM-DD'))
+            }}
+            slotProps={{
+              textField: { size: 'small', sx: { minWidth: 260 } },
+            }}
+          />
+        </Stack>
+      </LocalizationProvider>
 
       {error && (
         <Alert sx={{ mb: 2 }} severity="error" onClose={() => setError(null)}>
