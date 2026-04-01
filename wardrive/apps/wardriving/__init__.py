@@ -12,6 +12,7 @@ class SourceDevice:
     KISMET = "kismet"
     WARDRIVER_UK = "wardriver uk"
     KIISU = "kiisu board"
+    PWNTERREY_MARAUDER = "pwnterrey marauder"
     OTHER = "other"
 
     CHOICES = [
@@ -28,5 +29,6 @@ class SourceDevice:
         (KISMET, KISMET),
         (WARDRIVER_UK, WARDRIVER_UK),
         (KIISU,KIISU),
+        (PWNTERREY_MARAUDER, PWNTERREY_MARAUDER),
         (OTHER, OTHER),
     ]

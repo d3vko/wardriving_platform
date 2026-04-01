@@ -21,6 +21,7 @@ CHOICES_FUNCTION_PROCESS = {
     SourceDevice.KISMET: process_file_marauder_esp32,
     SourceDevice.WARDRIVER_UK: process_file_marauder_esp32,
     SourceDevice.KIISU: process_file_marauder_esp32,
+    SourceDevice.PWNTERREY_MARAUDER: process_file_minino,
     SourceDevice.OTHER: None,
 }
 

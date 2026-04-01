@@ -127,7 +127,14 @@ export default function Upload() {
               </MenuItem>
             ))}
           </Select>
-          {fieldError && !deviceSource && <FormHelperText>{fieldError}</FormHelperText>}
+          {fieldError && !deviceSource ? (
+            <FormHelperText error>{fieldError}</FormHelperText>
+          ) : (
+            <FormHelperText>
+              WiGLE CSV (first line <code>WigleWifi-…</code>): choose Minino, RF Wi‑Fi, or Pwnterrey Marauder.
+              Flipper / Marauder device types are for wardrive log files, not WiGLE spreadsheet exports.
+            </FormHelperText>
+          )}
         </FormControl>
 
         {/* Drop zone */}

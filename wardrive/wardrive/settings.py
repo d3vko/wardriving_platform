@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.wardriving",
     "apps.files",
     "apps.vendors",
+    "apps.misc",
 ]
 
 AUTH_USER_MODEL = "users.User"

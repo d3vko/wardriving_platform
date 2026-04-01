@@ -9,7 +9,7 @@ from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.wardriving.db_views import WardrivingVendorsView
+from apps.misc.db_views import WardrivingVendorView
 from apps.wardriving.filters import LteWardrivingFilterSet, WifiWardrivingFilterSet
 from apps.wardriving.kml_utils import build_kml_response
 from apps.wardriving.models import LTEWardriving
@@ -88,7 +88,7 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filterset_class = WifiWardrivingFilterSet
 
     def get_queryset(self):
-        return WardrivingVendorsView.objects.all()
+        return WardrivingVendorView.objects.all()
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):

@@ -116,7 +116,3 @@ class LTEWardriving(WardriveBaseModel):
         return is_zero_or_none(lat) and is_zero_or_none(lon)
 
 
-## Import all Views here
-from .db_views import (
-    WardrivingVendorsView,
-)

@@ -1,7 +1,7 @@
 from django_filters import rest_framework as filters
 
 from apps.core.utils import normalize_range_end, normalize_range_start
-from apps.wardriving.db_views import WardrivingVendorsView
+from apps.misc.db_views import WardrivingVendorView
 from apps.wardriving.models import LTEWardriving
 
 
@@ -37,7 +37,7 @@ class WifiWardrivingFilterSet(_FirstSeenDateRangeMixin, filters.FilterSet):
     uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
 
     class Meta:
-        model = WardrivingVendorsView
+        model = WardrivingVendorView
         fields: list[str] = []
 
 

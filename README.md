@@ -128,10 +128,10 @@ Supported formats are documented in:
 
 You may also upload logs following:
 
--   Wigle WiFi format
--   Minino device outputs
+-   **WiGLE WiFi CSV (e.g. v1.4)** — first line is metadata (`WigleWifi-1.4`, often with `appRelease=ESP32Marauder`); the **next** line is the header row (`MAC`, `SSID`, `AuthMode`, `FirstSeen`, `Channel`, `RSSI`, `CurrentLatitude`, `CurrentLongitude`, `AltitudeMeters`, `AccuracyMeters`, `Type`). When uploading, set **`device_source`** to **`minino`** or **`rf custom firmware wifi`** so the CSV is read with `skiprows=1` and the correct column mapping (`apps.process.minino` / `apps.process.rf`). **Do not** use **`marauder esp32`** or other Flipper/Marauder log options for this file type: those run `process_file_marauder_esp32`, which expects **line-based wardrive logs**, not a WiGLE spreadsheet export.
+-   Minino device outputs (same CSV shape as above; also available as **`pwnterrey marauder`** in this project when you want event-specific labeling while reusing the Minino processor).
 
-Both are directly compatible with the processing system.
+Both WiGLE-style CSV paths above are directly compatible with the processing system.
 
 ------------------------------------------------------------------------
 
@@ -139,6 +139,8 @@ Both are directly compatible with the processing system.
 
 -   🐾 **Minino:** `minino`
     https://github.com/ElectronicCats/Minino
+
+-   🎯 **Pwnterrey Marauder (event CSV):** `pwnterrey marauder` — same WiGLE-style CSV pipeline as Minino; use for exports whose first line is `WigleWifi-…`.
 
 -   🐉 **ESP32 Marauder:**
     Options: `flipper dev board`, `flipper dev board pro`,
@@ -257,6 +259,13 @@ Upload logs through DRF:
     "files": ["file1.log", "file2.log"]
 }
 ```
+
+## WiGLE WiFi CSV vs Marauder logs
+
+| `device_source` | Use for |
+| --- | --- |
+| `minino`, `rf custom firmware wifi`, `pwnterrey marauder` | WiGLE-style CSV (`WigleWifi-…` on line 1, column header on line 2). |
+| Flipper / Marauder / Kiisu / Kismet / Wardriver UK values | **Wardrive log** files (line-oriented exports), **not** WiGLE CSV spreadsheets. |
 
 ## Flipper Zero / Marauder ESP32 logs
 

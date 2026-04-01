@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.wardriving.db_views import WardrivingVendorsView
+from apps.misc.db_views import WardrivingVendorView
 from apps.wardriving.models import LTEWardriving
 
 
@@ -25,7 +25,7 @@ class WifiWardrivingSerializer(serializers.ModelSerializer):
     current_longitude = serializers.FloatField()
 
     class Meta:
-        model = WardrivingVendorsView
+        model = WardrivingVendorView
         fields = (
             "mac",
             "vendor",

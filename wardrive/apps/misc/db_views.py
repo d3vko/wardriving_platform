@@ -1,12 +1,12 @@
 from django.db import models
 from django_db_views.db_view import DBView
 
-from apps.wardriving.sql_views import (
+from apps.misc.sql_views import (
     WardrivingVendorsSQL,
 )
 
 
-class WardrivingVendorsView(DBView):
+class WardrivingVendorView(DBView):
     id = models.BigIntegerField(primary_key=True)
     mac = models.CharField()
     registry = models.CharField()
