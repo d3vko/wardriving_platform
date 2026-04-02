@@ -1,4 +1,4 @@
-const API_BASE = '/wardriving/api/v1'
+export const API_BASE = '/wardriving/v1'
 
 const STORAGE_KEY = 'wardrive-auth'
 
@@ -34,6 +34,23 @@ async function doRefresh(refresh: string): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+/** Use before WebSocket connect if access may be invalid; same refresh as apiFetch. */
+export async function refreshAccessTokenOrThrow(): Promise<string> {
+  const tokens = getTokens()
+  if (!tokens?.refresh) {
+    clearTokens()
+    window.dispatchEvent(new CustomEvent('wardrive:logout'))
+    throw new ApiError(401, 'Session expired. Please sign in again.')
+  }
+  const access = await doRefresh(tokens.refresh)
+  if (!access) {
+    clearTokens()
+    window.dispatchEvent(new CustomEvent('wardrive:logout'))
+    throw new ApiError(401, 'Session expired. Please sign in again.')
+  }
+  return access
 }
 
 export class ApiError extends Error {

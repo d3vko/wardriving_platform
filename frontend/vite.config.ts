@@ -21,6 +21,9 @@ export default defineConfig({
       '/wardriving': {
         target: API_TARGET,
         changeOrigin: true,
+        ws: true,
+        // Misma convención que nginx: el backend Django recibe /v1/... sin prefijo /wardriving
+        rewrite: (path) => path.replace(/^\/wardriving/, ''),
       },
     },
   },

@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { ReactNode } from 'react'
 import { login as apiLogin, register as apiRegister } from '@/api/auth'
-import { getTokens, setTokens, clearTokens } from '@/api/client'
+import { API_BASE, getTokens, setTokens, clearTokens } from '@/api/client'
 
 interface User {
   username: string
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const tokens = getTokens()
       if (!tokens?.refresh) return
       try {
-        const res = await fetch('/wardriving/api/v1/auth/token/refresh/', {
+        const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh: tokens.refresh }),

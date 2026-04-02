@@ -1,4 +1,8 @@
-import { apiFetch, apiFetchBlob } from '@/api/client'
+import {
+  ApiError,
+  getTokens,
+  refreshAccessTokenOrThrow,
+} from '@/api/client'
 
 export type WardrivingPlace = {
   mac: string
@@ -31,42 +35,147 @@ export type PlacesListParams = {
   first_seen_before?: string
 }
 
-function buildPlacesUrl(
+function wsScheme(): string {
+  return window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+}
+
+function wardriveListWsPath(resource: 'wifi' | 'lte'): string {
+  return `/wardriving/v1/wardrive/${resource}/`
+}
+
+function wardriveKmlWsPath(kind: 'wifi' | 'lte'): string {
+  return `/wardriving/v1/wardrive/${kind}/kml/`
+}
+
+function buildWsUrl(path: string, token: string): string {
+  const q = new URLSearchParams({ token })
+  return `${wsScheme()}//${window.location.host}${path}?${q.toString()}`
+}
+
+function listPayloadFromParams(params: PlacesListParams, id: string): Record<string, unknown> {
+  const out: Record<string, unknown> = { id }
+  if (params.page != null) out.page = params.page
+  if (params.page_size != null) out.page_size = params.page_size
+  if (params.uploaded_by) out.uploaded_by = params.uploaded_by
+  if (params.first_seen_after) out.first_seen_after = params.first_seen_after
+  if (params.first_seen_before) out.first_seen_before = params.first_seen_before
+  return out
+}
+
+async function getAccessTokenForWs(): Promise<string> {
+  const t = getTokens()
+  if (t?.access) return t.access
+  return refreshAccessTokenOrThrow()
+}
+
+function fetchPlacesViaWs(
   resource: 'wifi' | 'lte',
   params: PlacesListParams,
-): string {
-  const sp = new URLSearchParams()
-  if (params.page != null) sp.set('page', String(params.page))
-  if (params.page_size != null) sp.set('page_size', String(params.page_size))
-  if (params.uploaded_by) sp.set('uploaded_by', params.uploaded_by)
-  if (params.first_seen_after) sp.set('first_seen_after', params.first_seen_after)
-  if (params.first_seen_before) sp.set('first_seen_before', params.first_seen_before)
-  const q = sp.toString()
-  return `/wardrive/${resource}/${q ? `?${q}` : ''}`
+  accessToken: string,
+): Promise<PaginatedPlaces> {
+  return new Promise((resolve, reject) => {
+    const path = wardriveListWsPath(resource)
+    const ws = new WebSocket(buildWsUrl(path, accessToken))
+    const id = crypto.randomUUID()
+    const payload = listPayloadFromParams(params, id)
+    const timeoutMs = 90_000
+    let settled = false
+    let retried401 = false
+
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      ws.close()
+      reject(new Error('Wardriving map request timed out.'))
+    }, timeoutMs)
+
+    const finish = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      fn()
+    }
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify(payload))
+    }
+
+    ws.onmessage = (ev) => {
+      if (typeof ev.data !== 'string') return
+      let msg: {
+        id?: string
+        ok?: boolean
+        data?: PaginatedPlaces
+        status?: number
+        detail?: unknown
+      }
+      try {
+        msg = JSON.parse(ev.data) as typeof msg
+      } catch {
+        finish(() => reject(new Error('Invalid WebSocket response')))
+        ws.close()
+        return
+      }
+      if (msg.id !== id) return
+      finish(() => {
+        ws.close()
+        if (msg.ok && msg.data) {
+          resolve(msg.data)
+        } else {
+          reject(
+            new ApiError(
+              msg.status ?? 500,
+              String(msg.detail ?? 'Request failed'),
+              msg,
+            ),
+          )
+        }
+      })
+    }
+
+    ws.onerror = () => {
+      finish(() => reject(new Error('WebSocket connection error')))
+    }
+
+    ws.onclose = (ev) => {
+      if (settled) return
+      if (ev.code === 4001 && !retried401) {
+        retried401 = true
+        void refreshAccessTokenOrThrow()
+          .then((newToken) =>
+            fetchPlacesViaWs(resource, params, newToken).then(resolve, reject),
+          )
+          .catch(reject)
+        return
+      }
+      finish(() =>
+        reject(
+          new Error(
+            ev.reason || `WebSocket closed (${ev.code})`,
+          ),
+        ),
+      )
+    }
+  })
 }
 
-export function fetchWifiPlaces(params: PlacesListParams): Promise<PaginatedPlaces> {
-  return apiFetch<PaginatedPlaces>(buildPlacesUrl('wifi', params))
+export async function fetchWifiPlaces(
+  params: PlacesListParams,
+): Promise<PaginatedPlaces> {
+  const token = await getAccessTokenForWs()
+  return fetchPlacesViaWs('wifi', params, token)
 }
 
-export function fetchLtePlaces(params: PlacesListParams): Promise<PaginatedPlaces> {
-  return apiFetch<PaginatedPlaces>(buildPlacesUrl('lte', params))
+export async function fetchLtePlaces(
+  params: PlacesListParams,
+): Promise<PaginatedPlaces> {
+  const token = await getAccessTokenForWs()
+  return fetchPlacesViaWs('lte', params, token)
 }
 
-type KmlKind = 'wifi' | 'lte'
-
-/** Required query params for KML export (the API returns 400 if either is missing). */
 export type KmlDownloadParams = {
   first_seen_after: string
   first_seen_before: string
-}
-
-function kmlPath(kind: KmlKind, params: KmlDownloadParams): string {
-  const base = kind === 'wifi' ? '/wardrive/wifi/kml/' : '/wardrive/lte/kml/'
-  const sp = new URLSearchParams()
-  sp.set('first_seen_after', params.first_seen_after)
-  sp.set('first_seen_before', params.first_seen_before)
-  return `${base}?${sp.toString()}`
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -80,12 +189,117 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
+function downloadKmlViaWs(
+  kind: 'wifi' | 'lte',
+  params: KmlDownloadParams,
+  accessToken: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const path = wardriveKmlWsPath(kind)
+    const ws = new WebSocket(buildWsUrl(path, accessToken))
+    ws.binaryType = 'blob'
+    const id = crypto.randomUUID()
+    const payload = {
+      id,
+      first_seen_after: params.first_seen_after,
+      first_seen_before: params.first_seen_before,
+    }
+    let meta: { filename?: string } | null = null
+    let retried401 = false
+    let settled = false
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      ws.close()
+      reject(new Error('KML download timed out.'))
+    }, 300_000)
+
+    const finish = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      fn()
+    }
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify(payload))
+    }
+
+    ws.onmessage = (ev) => {
+      if (typeof ev.data === 'string') {
+        let msg: {
+          id?: string
+          ok?: boolean
+          type?: string
+          filename?: string
+          status?: number
+          detail?: unknown
+        }
+        try {
+          msg = JSON.parse(ev.data) as typeof msg
+        } catch {
+          finish(() => reject(new Error('Invalid KML response')))
+          ws.close()
+          return
+        }
+        if (msg.id !== id) return
+        if (!msg.ok) {
+          finish(() => {
+            ws.close()
+            reject(
+              new ApiError(
+                msg.status ?? 400,
+                String(msg.detail ?? 'KML export failed'),
+                msg,
+              ),
+            )
+          })
+          return
+        }
+        meta = { filename: msg.filename }
+        return
+      }
+      const blob =
+        ev.data instanceof Blob
+          ? ev.data
+          : new Blob([ev.data as ArrayBuffer], {
+              type: 'application/vnd.google-earth.kml+xml',
+            })
+      const name =
+        meta?.filename ?? (kind === 'wifi' ? 'wifi_scans.kml' : 'lte_scans.kml')
+      finish(() => {
+        downloadBlob(blob, name)
+        ws.close()
+        resolve()
+      })
+    }
+
+    ws.onerror = () => {
+      finish(() => reject(new Error('WebSocket error during KML download')))
+    }
+
+    ws.onclose = (ev) => {
+      if (settled) return
+      if (ev.code === 4001 && !retried401) {
+        retried401 = true
+        void refreshAccessTokenOrThrow()
+          .then((t) => downloadKmlViaWs(kind, params, t).then(resolve, reject))
+          .catch(reject)
+        return
+      }
+      finish(() =>
+        reject(new Error(ev.reason || `WebSocket closed (${ev.code})`)),
+      )
+    }
+  })
+}
+
 export async function downloadWifiKml(params: KmlDownloadParams): Promise<void> {
-  const blob = await apiFetchBlob(kmlPath('wifi', params), { method: 'GET' })
-  downloadBlob(blob, 'wifi_scans.kml')
+  const token = await getAccessTokenForWs()
+  return downloadKmlViaWs('wifi', params, token)
 }
 
 export async function downloadLteKml(params: KmlDownloadParams): Promise<void> {
-  const blob = await apiFetchBlob(kmlPath('lte', params), { method: 'GET' })
-  downloadBlob(blob, 'lte_scans.kml')
+  const token = await getAccessTokenForWs()
+  return downloadKmlViaWs('lte', params, token)
 }

@@ -19,24 +19,16 @@ def _build_description(rows: list[tuple[str, str]]) -> str:
     )
 
 
-def build_kml_response(
+def build_kml_bytes(
     *,
     queryset,
-    filename: str,
     pin_color: str,
     name_fn,
     lat_fn,
     lon_fn,
     extra_fn,
-) -> HttpResponse:
-    """
-    Build and return a KML download from a queryset.
-
-    Each callable receives `obj` and returns:
-    - name_fn -> str for the placemark name
-    - lat_fn/lon_fn -> coordinates
-    - extra_fn -> dict of metadata for table/extended data
-    """
+) -> bytes:
+    """UTF-8 KML document bytes (shared by HTTP response and WebSocket binary frame)."""
     kml = simplekml.Kml()
     icon_href = "https://raw.githubusercontent.com/AdrianPardo99/flipper_zero_anims_assets/refs/heads/hide/Ultra-hide-branch/misc_icons/kml_icon-v2_wo_back.png"
 
@@ -62,8 +54,37 @@ def build_kml_response(
 
     buffer = BytesIO()
     buffer.write(kml.kml().encode("utf-8"))
+    return buffer.getvalue()
+
+
+def build_kml_response(
+    *,
+    queryset,
+    filename: str,
+    pin_color: str,
+    name_fn,
+    lat_fn,
+    lon_fn,
+    extra_fn,
+) -> HttpResponse:
+    """
+    Build and return a KML download from a queryset.
+
+    Each callable receives `obj` and returns:
+    - name_fn -> str for the placemark name
+    - lat_fn/lon_fn -> coordinates
+    - extra_fn -> dict of metadata for table/extended data
+    """
+    body = build_kml_bytes(
+        queryset=queryset,
+        pin_color=pin_color,
+        name_fn=name_fn,
+        lat_fn=lat_fn,
+        lon_fn=lon_fn,
+        extra_fn=extra_fn,
+    )
     response = HttpResponse(
-        buffer.getvalue(),
+        body,
         content_type="application/vnd.google-earth.kml+xml",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'

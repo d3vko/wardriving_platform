@@ -21,6 +21,7 @@ import {
   fetchWifiPlaces,
   type WardrivingPlace,
 } from '@/api/wardriveMap'
+import { useAuth } from '@/context/AuthContext'
 import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
@@ -29,9 +30,10 @@ import dayjs, { type Dayjs } from 'dayjs'
 
 import 'leaflet/dist/leaflet.css'
 
-/** Visible points per map “page” (4 × 250). */
-const VIEW_SIZE = 1000
+/** Puntos visibles por “página” del mapa (10 × 250) => máx 2500 pines. */
+const VIEW_SIZE = 2500
 const BATCH_SIZE = 250
+const BATCHES_PER_VIEW = VIEW_SIZE / BATCH_SIZE
 
 const DEFAULT_CENTER: [number, number] = [40.4168, -3.7038]
 const DEFAULT_ZOOM = 6
@@ -85,6 +87,7 @@ function parsePageParam(raw: string | null): number {
 }
 
 export default function WardrivingMap() {
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const modeParam = searchParams.get('mode')
   const mode: 'wifi' | 'lte' = modeParam === 'lte' ? 'lte' : 'wifi'
@@ -163,17 +166,19 @@ export default function WardrivingMap() {
     async function load() {
       setLoading(true)
       setError(null)
-      const baseSubPage = (page - 1) * 4 + 1
+      const baseSubPage = (page - 1) * BATCHES_PER_VIEW + 1
       const params = {
         first_seen_after,
         first_seen_before,
+        ...(user?.username ? { uploaded_by: user.username } : {}),
       }
       try {
-        const fetchFn = mode === 'wifi' ? fetchWifiPlaces : fetchLtePlaces
+        /** Listas WiFi/LTE vía WebSocket (`wardriveMap.ts`). */
+        const fetchPlacesForMode = mode === 'wifi' ? fetchWifiPlaces : fetchLtePlaces
 
         // First batch only — get total count, then request extra pages only if they exist.
         // (DRF returns 404 for page > last page; parallel requests to empty pages break the UI.)
-        const first = await fetchFn({
+        const first = await fetchPlacesForMode({
           page: baseSubPage,
           page_size: BATCH_SIZE,
           ...params,
@@ -184,10 +189,13 @@ export default function WardrivingMap() {
         const startOffset = (baseSubPage - 1) * BATCH_SIZE
         const itemsAvailable = Math.max(0, totalCount - startOffset)
         const itemsToFetch = Math.min(VIEW_SIZE, itemsAvailable)
-        const numBatches = Math.min(
-          4,
-          itemsToFetch === 0 ? 0 : Math.ceil(itemsToFetch / BATCH_SIZE),
-        )
+        const numBatches =
+          itemsToFetch === 0
+            ? 0
+            : Math.min(
+                BATCHES_PER_VIEW,
+                Math.ceil(itemsToFetch / BATCH_SIZE),
+              )
 
         if (numBatches <= 1) {
           setData(first.results)
@@ -197,7 +205,7 @@ export default function WardrivingMap() {
 
         const rest = await Promise.all(
           Array.from({ length: numBatches - 1 }, (_, i) =>
-            fetchFn({
+            fetchPlacesForMode({
               page: baseSubPage + 1 + i,
               page_size: BATCH_SIZE,
               ...params,
@@ -223,7 +231,7 @@ export default function WardrivingMap() {
     return () => {
       cancelled = true
     }
-  }, [mode, page, first_seen_after, first_seen_before])
+  }, [mode, page, first_seen_after, first_seen_before, user?.username])
 
   const pageCount = Math.max(1, Math.ceil(total / VIEW_SIZE) || 1)
 
@@ -236,13 +244,19 @@ export default function WardrivingMap() {
   return (
     <Stack spacing={2} sx={{ height: '100%', minHeight: 480 }}>
       <Box>
-        <Typography variant="h5" fontWeight={700} gutterBottom>
-          Wardriving map
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Each view loads up to {VIEW_SIZE} pins in batches of {BATCH_SIZE} (only as many requests as
-          needed — no empty pages). Date filters in the URL (<code>first_seen_after</code>,{' '}
-          <code>first_seen_before</code>). Legend by signal strength.
+        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+          <Typography variant="h5" fontWeight={700}>
+            Wardriving map
+          </Typography>
+          <Chip label="WiFi / LTE · WebSocket" size="small" variant="outlined" color="secondary" />
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Map data (WiFi and LTE) loads over WebSocket to the same paths as the REST list API. Up to{' '}
+          {VIEW_SIZE} pins per view in batches of {BATCH_SIZE}. Date filters in the URL (
+          <code>first_seen_after</code>, <code>first_seen_before</code>). Legend by signal strength.
+          {user?.username ? (
+            <> Showing points matching your username filter (<code>uploaded_by</code>).</>
+          ) : null}
         </Typography>
       </Box>
 
@@ -254,6 +268,7 @@ export default function WardrivingMap() {
               value={dayjs(isoToDateInputValue(first_seen_after))}
               minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
               maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+              disabled={loading}
               onChange={(value: Dayjs | null) => {
                 if (!value || !value.isValid()) return
                 setDateRange(value.format('YYYY-MM-DD'), isoToDateInputValue(first_seen_before))
@@ -267,6 +282,7 @@ export default function WardrivingMap() {
               value={dayjs(isoToDateInputValue(first_seen_before))}
               minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
               maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+              disabled={loading}
               onChange={(value: Dayjs | null) => {
                 if (!value || !value.isValid()) return
                 setDateRange(isoToDateInputValue(first_seen_after), value.format('YYYY-MM-DD'))
@@ -285,12 +301,12 @@ export default function WardrivingMap() {
           exclusive
           onChange={handleModeChange}
           size="small"
+          disabled={loading}
           aria-label="Map mode"
         >
           <ToggleButton value="wifi">WiFi</ToggleButton>
           <ToggleButton value="lte">LTE</ToggleButton>
         </ToggleButtonGroup>
-        {loading && <CircularProgress size={22} />}
         {!loading && (
           <Chip
             size="small"
@@ -347,10 +363,40 @@ export default function WardrivingMap() {
           borderRadius: 2,
         }}
       >
+        {loading && (
+          <Box
+            role="progressbar"
+            aria-busy="true"
+            aria-live="polite"
+            aria-label="Cargando datos del mapa"
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 1400,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              px: 3,
+              bgcolor: 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(6px)',
+              borderRadius: 2,
+            }}
+          >
+            <CircularProgress size={48} thickness={4} />
+            <Typography variant="body1" color="text.secondary" textAlign="center" fontWeight={500}>
+              Cargando datos del mapa…
+            </Typography>
+            <Typography variant="caption" color="text.disabled" textAlign="center" sx={{ maxWidth: 280 }}>
+              Espera un momento; el mapa no está disponible hasta que termine la carga.
+            </Typography>
+          </Box>
+        )}
         <MapContainer
           center={DEFAULT_CENTER}
           zoom={DEFAULT_ZOOM}
-          scrollWheelZoom
+          scrollWheelZoom={!loading}
           style={{ height: '100%', width: '100%', minHeight: 420 }}
         >
           <TileLayer

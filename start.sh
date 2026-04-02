@@ -28,7 +28,8 @@ if [ "${ENVIRONMENT}" == "local" ]; then
     echo "Starting Django development server"
     python /code/wardrive/manage.py runserver 0.0.0.0:8000
 else
-    echo "Starting Gunicorn server"
+    echo "Starting Daphne (ASGI: HTTP + WebSocket)"
     python /code/wardrive/manage.py collectstatic --noinput
-    gunicorn --forwarded-allow-ips="*" --pythonpath /code/wardrive wardrive.wsgi:application --workers=4 --bind 0.0.0.0:8000
+    export PYTHONPATH=/code/wardrive
+    exec daphne -b 0.0.0.0 -p 8000 wardrive.asgi:application
 fi

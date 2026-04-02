@@ -372,6 +372,28 @@ CELERY_TASK_REJECT_ON_WORKER_LOST = True
 
 APPEND_SLASH = False
 USE_X_FORWARDED_HOST = True
+
+# Django Channels (WebSocket). In-memory is enough for single-process; use Redis in multi-worker.
+if REDIS_URL.strip():
+    try:
+        import channels_redis  # noqa: F401, F403
+
+        _channel_hosts = [_redis_url_with_db(REDIS_URL, 3)]
+        CHANNEL_LAYERS = {
+            "default": {
+                "BACKEND": "channels_redis.core.RedisChannelLayer",
+                "CONFIG": {"hosts": _channel_hosts},
+            },
+        }
+    except ImportError:
+        CHANNEL_LAYERS = {
+            "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+        }
+else:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
+
 CSRF_TRUSTED_ORIGINS = env.list(
     "CSRF_TRUSTED_ORIGINS",
     default=[
