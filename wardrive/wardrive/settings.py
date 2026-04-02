@@ -37,7 +37,6 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "django_db_views",
     "channels",
-    "chat",
     # Local apps
     "apps.wardriving",
     "apps.files",
