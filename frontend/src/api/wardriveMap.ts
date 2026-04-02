@@ -39,6 +39,27 @@ function wsScheme(): string {
   return window.location.protocol === 'https:' ? 'wss:' : 'ws:'
 }
 
+function randomId(): string {
+  // Algunos entornos no traen `crypto.randomUUID` (p.ej. navegadores viejos o
+  // ejecución fuera del browser). Usamos fallback seguro.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16)
+    crypto.getRandomValues(bytes)
+    // UUID v4: set version (4) and variant (10xx)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  }
+
+  // Fallback último recurso (no criptográficamente fuerte)
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 function wardriveListWsPath(resource: 'wifi' | 'lte'): string {
   return `/wardriving/v1/wardrive/${resource}/`
 }
@@ -76,7 +97,7 @@ function fetchPlacesViaWs(
   return new Promise((resolve, reject) => {
     const path = wardriveListWsPath(resource)
     const ws = new WebSocket(buildWsUrl(path, accessToken))
-    const id = crypto.randomUUID()
+    const id = randomId()
     const payload = listPayloadFromParams(params, id)
     const timeoutMs = 90_000
     let settled = false
@@ -198,7 +219,7 @@ function downloadKmlViaWs(
     const path = wardriveKmlWsPath(kind)
     const ws = new WebSocket(buildWsUrl(path, accessToken))
     ws.binaryType = 'blob'
-    const id = crypto.randomUUID()
+    const id = randomId()
     const payload = {
       id,
       first_seen_after: params.first_seen_after,
