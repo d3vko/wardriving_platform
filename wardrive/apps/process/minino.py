@@ -1,6 +1,7 @@
 """
 Minino (Electronic Cats) device file processor.
 """
+
 from datetime import datetime
 from decimal import Decimal
 

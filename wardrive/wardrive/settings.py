@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "django_filters",
     "django_celery_beat",
     "django_db_views",
+    "channels",
+    "chat",
     # Local apps
     "apps.wardriving",
     "apps.files",
@@ -79,6 +81,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "wardrive.wsgi.application"
+
+ASGI_APPLICATION = "wardrive.asgi.application"
 
 
 DATABASES = {
@@ -163,6 +167,7 @@ SIMPLE_JWT = {
 # CORS
 CORS_ALLOW_ALL_ORIGINS = env("CORS_ORIGIN_ALLOW_ALL", default=False, cast=bool)
 
+
 # Storage: S3/MinIO when USE_S3=true, else filesystem
 # Two buckets: one for wardrive (media), one for CTFd (ctfd)
 # Bucket names must be S3-valid: lowercase, numbers, hyphens only (no underscores)
@@ -171,11 +176,14 @@ def _s3_bucket_name(name):
         return name
     return str(name).lower().replace("_", "-").strip() or "media"
 
+
 USE_S3_STORAGE = env("USE_S3_STORAGE", default=False, cast=bool)
 AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
 AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
-AWS_STORAGE_BUCKET_NAME = _s3_bucket_name(env("AWS_STORAGE_BUCKET_NAME", default="media"))
+AWS_STORAGE_BUCKET_NAME = _s3_bucket_name(
+    env("AWS_STORAGE_BUCKET_NAME", default="media")
+)
 AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="us-east-1")
 AWS_S3_FILE_OVERWRITE = env("AWS_S3_FILE_OVERWRITE", default=False, cast=bool)
 AWS_DEFAULT_ACL = env("AWS_DEFAULT_ACL", default="public-read")
@@ -183,7 +191,12 @@ AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": env("AWS_S3_CACHE_CONTROL", default="max-age=86400"),
 }
 
-if USE_S3_STORAGE and AWS_S3_ENDPOINT_URL and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+if (
+    USE_S3_STORAGE
+    and AWS_S3_ENDPOINT_URL
+    and AWS_ACCESS_KEY_ID
+    and AWS_SECRET_ACCESS_KEY
+):
     _s3_options = {
         "endpoint_url": AWS_S3_ENDPOINT_URL,
         "access_key": AWS_ACCESS_KEY_ID,
@@ -254,7 +267,9 @@ if not REDIS_URL.strip():
     REDIS_PASSWORD = env("REDIS_PASSWORD", default="")
     if REDIS_HOST and REDIS_PORT:
         if REDIS_PASSWORD:
-            REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+            REDIS_URL = (
+                f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+            )
         else:
             REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 # Redis 6+ ACL (e.g. Railway) requires a username; normalize redis://:password@host -> redis://USERNAME:password@host

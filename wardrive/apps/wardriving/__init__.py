@@ -28,7 +28,7 @@ class SourceDevice:
         (RF_CUSTOM_FIRMWARE_LTE, RF_CUSTOM_FIRMWARE_LTE),
         (KISMET, KISMET),
         (WARDRIVER_UK, WARDRIVER_UK),
-        (KIISU,KIISU),
+        (KIISU, KIISU),
         (PWNTERREY_MARAUDER, PWNTERREY_MARAUDER),
         (OTHER, OTHER),
     ]

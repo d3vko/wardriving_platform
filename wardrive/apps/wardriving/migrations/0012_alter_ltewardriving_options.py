@@ -6,12 +6,15 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wardriving', '0011_alter_ltewardriving_device_source_and_more'),
+        ("wardriving", "0011_alter_ltewardriving_device_source_and_more"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='ltewardriving',
-            options={'verbose_name': 'LTE Wardriving Found', 'verbose_name_plural': 'LTE Wardriving Founds'},
+            name="ltewardriving",
+            options={
+                "verbose_name": "LTE Wardriving Found",
+                "verbose_name_plural": "LTE Wardriving Founds",
+            },
         ),
     ]

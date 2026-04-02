@@ -7,35 +7,46 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='WardrivingVendorView',
+            name="WardrivingVendorView",
             fields=[
-                ('id', models.BigIntegerField(primary_key=True, serialize=False)),
-                ('mac', models.CharField()),
-                ('registry', models.CharField()),
-                ('vendor', models.CharField()),
-                ('source', models.CharField()),
-                ('ssid', models.CharField()),
-                ('auth_mode', models.CharField()),
-                ('first_seen', models.DateTimeField()),
-                ('channel', models.IntegerField()),
-                ('rssi', models.IntegerField()),
-                ('signal_streng', models.CharField()),
-                ('current_latitude', models.DecimalField(decimal_places=7, max_digits=13)),
-                ('current_longitude', models.DecimalField(decimal_places=7, max_digits=13)),
-                ('altitude_meters', models.DecimalField(decimal_places=2, max_digits=10)),
-                ('accuracy_meters', models.DecimalField(decimal_places=2, max_digits=6)),
-                ('type', models.CharField()),
-                ('device_source', models.CharField()),
-                ('uploaded_by', models.TextField()),
+                ("id", models.BigIntegerField(primary_key=True, serialize=False)),
+                ("mac", models.CharField()),
+                ("registry", models.CharField()),
+                ("vendor", models.CharField()),
+                ("source", models.CharField()),
+                ("ssid", models.CharField()),
+                ("auth_mode", models.CharField()),
+                ("first_seen", models.DateTimeField()),
+                ("channel", models.IntegerField()),
+                ("rssi", models.IntegerField()),
+                ("signal_streng", models.CharField()),
+                (
+                    "current_latitude",
+                    models.DecimalField(decimal_places=7, max_digits=13),
+                ),
+                (
+                    "current_longitude",
+                    models.DecimalField(decimal_places=7, max_digits=13),
+                ),
+                (
+                    "altitude_meters",
+                    models.DecimalField(decimal_places=2, max_digits=10),
+                ),
+                (
+                    "accuracy_meters",
+                    models.DecimalField(decimal_places=2, max_digits=6),
+                ),
+                ("type", models.CharField()),
+                ("device_source", models.CharField()),
+                ("uploaded_by", models.TextField()),
             ],
             options={
-                'db_table': 'wardriving_vendor',
-                'managed': False,
+                "db_table": "wardriving_vendor",
+                "managed": False,
             },
         ),
     ]

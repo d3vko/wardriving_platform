@@ -114,5 +114,3 @@ class LTEWardriving(WardriveBaseModel):
 
         # Default when we have no real coordinates
         return is_zero_or_none(lat) and is_zero_or_none(lon)
-
-

@@ -6,18 +6,60 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wardriving', '0015_delete_wardrivingvendorsview'),
+        ("wardriving", "0015_delete_wardrivingvendorsview"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='ltewardriving',
-            name='device_source',
-            field=models.CharField(choices=[('unknown', 'unknown'), ('minino', 'minino'), ('flipper dev board', 'flipper dev board'), ('flipper dev board pro', 'flipper dev board pro'), ('marauder v4', 'marauder v4'), ('marauder v6', 'marauder v6'), ('flipper bffb', 'flipper bffb'), ('marauder esp32', 'marauder esp32'), ('rf custom firmware wifi', 'rf custom firmware wifi'), ('rf custom firmware lte', 'rf custom firmware lte'), ('kismet', 'kismet'), ('wardriver uk', 'wardriver uk'), ('kiisu board', 'kiisu board'), ('pwnterrey marauder', 'pwnterrey marauder'), ('other', 'other')], default='unknown', max_length=50, verbose_name='Source'),
+            model_name="ltewardriving",
+            name="device_source",
+            field=models.CharField(
+                choices=[
+                    ("unknown", "unknown"),
+                    ("minino", "minino"),
+                    ("flipper dev board", "flipper dev board"),
+                    ("flipper dev board pro", "flipper dev board pro"),
+                    ("marauder v4", "marauder v4"),
+                    ("marauder v6", "marauder v6"),
+                    ("flipper bffb", "flipper bffb"),
+                    ("marauder esp32", "marauder esp32"),
+                    ("rf custom firmware wifi", "rf custom firmware wifi"),
+                    ("rf custom firmware lte", "rf custom firmware lte"),
+                    ("kismet", "kismet"),
+                    ("wardriver uk", "wardriver uk"),
+                    ("kiisu board", "kiisu board"),
+                    ("pwnterrey marauder", "pwnterrey marauder"),
+                    ("other", "other"),
+                ],
+                default="unknown",
+                max_length=50,
+                verbose_name="Source",
+            ),
         ),
         migrations.AlterField(
-            model_name='wardriving',
-            name='device_source',
-            field=models.CharField(choices=[('unknown', 'unknown'), ('minino', 'minino'), ('flipper dev board', 'flipper dev board'), ('flipper dev board pro', 'flipper dev board pro'), ('marauder v4', 'marauder v4'), ('marauder v6', 'marauder v6'), ('flipper bffb', 'flipper bffb'), ('marauder esp32', 'marauder esp32'), ('rf custom firmware wifi', 'rf custom firmware wifi'), ('rf custom firmware lte', 'rf custom firmware lte'), ('kismet', 'kismet'), ('wardriver uk', 'wardriver uk'), ('kiisu board', 'kiisu board'), ('pwnterrey marauder', 'pwnterrey marauder'), ('other', 'other')], default='unknown', max_length=50, verbose_name='Source'),
+            model_name="wardriving",
+            name="device_source",
+            field=models.CharField(
+                choices=[
+                    ("unknown", "unknown"),
+                    ("minino", "minino"),
+                    ("flipper dev board", "flipper dev board"),
+                    ("flipper dev board pro", "flipper dev board pro"),
+                    ("marauder v4", "marauder v4"),
+                    ("marauder v6", "marauder v6"),
+                    ("flipper bffb", "flipper bffb"),
+                    ("marauder esp32", "marauder esp32"),
+                    ("rf custom firmware wifi", "rf custom firmware wifi"),
+                    ("rf custom firmware lte", "rf custom firmware lte"),
+                    ("kismet", "kismet"),
+                    ("wardriver uk", "wardriver uk"),
+                    ("kiisu board", "kiisu board"),
+                    ("pwnterrey marauder", "pwnterrey marauder"),
+                    ("other", "other"),
+                ],
+                default="unknown",
+                max_length=50,
+                verbose_name="Source",
+            ),
         ),
     ]

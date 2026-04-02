@@ -2,6 +2,7 @@
 Custom S3/MinIO storage backend that normalizes object keys and tolerates MinIO
 HeadObject 400 (treat as "not exists") so uploads can complete.
 """
+
 import re
 
 from django.conf import settings

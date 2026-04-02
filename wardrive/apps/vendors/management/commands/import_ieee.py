@@ -140,9 +140,7 @@ def registry_to_prefix_bits(registry: str) -> int:
 
 
 class Command(BaseCommand):
-    help = (
-        "Import IEEE OUI (MA-L) from oui.txt (fallback to oui.csv) into the Vendors table."
-    )
+    help = "Import IEEE OUI (MA-L) from oui.txt (fallback to oui.csv) into the Vendors table."
 
     def add_arguments(self, parser):
         parser.add_argument(

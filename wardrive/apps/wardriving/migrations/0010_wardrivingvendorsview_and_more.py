@@ -6,45 +6,69 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wardriving', '0009_alter_ltewardriving_device_source_and_more'),
+        ("wardriving", "0009_alter_ltewardriving_device_source_and_more"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='WardrivingVendorsView',
+            name="WardrivingVendorsView",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('mac', models.CharField()),
-                ('registry', models.CharField()),
-                ('vendor', models.CharField()),
-                ('source', models.CharField()),
-                ('ssid', models.CharField()),
-                ('auth_mode', models.CharField()),
-                ('first_seen', models.DateTimeField()),
-                ('channel', models.IntegerField()),
-                ('rssi', models.IntegerField()),
-                ('signal_streng', models.CharField()),
-                ('current_latitude', models.DecimalField(decimal_places=7, max_digits=13)),
-                ('current_longitude', models.DecimalField(decimal_places=7, max_digits=13)),
-                ('altitude_meters', models.DecimalField(decimal_places=2, max_digits=10)),
-                ('accuracy_meters', models.DecimalField(decimal_places=2, max_digits=6)),
-                ('type', models.CharField()),
-                ('device_source', models.CharField()),
-                ('uploaded_by', models.TextField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("mac", models.CharField()),
+                ("registry", models.CharField()),
+                ("vendor", models.CharField()),
+                ("source", models.CharField()),
+                ("ssid", models.CharField()),
+                ("auth_mode", models.CharField()),
+                ("first_seen", models.DateTimeField()),
+                ("channel", models.IntegerField()),
+                ("rssi", models.IntegerField()),
+                ("signal_streng", models.CharField()),
+                (
+                    "current_latitude",
+                    models.DecimalField(decimal_places=7, max_digits=13),
+                ),
+                (
+                    "current_longitude",
+                    models.DecimalField(decimal_places=7, max_digits=13),
+                ),
+                (
+                    "altitude_meters",
+                    models.DecimalField(decimal_places=2, max_digits=10),
+                ),
+                (
+                    "accuracy_meters",
+                    models.DecimalField(decimal_places=2, max_digits=6),
+                ),
+                ("type", models.CharField()),
+                ("device_source", models.CharField()),
+                ("uploaded_by", models.TextField()),
             ],
             options={
-                'db_table': 'wardriving_vendor',
-                'managed': False,
+                "db_table": "wardriving_vendor",
+                "managed": False,
             },
         ),
         migrations.AlterField(
-            model_name='wardriving',
-            name='current_latitude',
-            field=models.DecimalField(decimal_places=7, default=0, max_digits=13, verbose_name='Latitude'),
+            model_name="wardriving",
+            name="current_latitude",
+            field=models.DecimalField(
+                decimal_places=7, default=0, max_digits=13, verbose_name="Latitude"
+            ),
         ),
         migrations.AlterField(
-            model_name='wardriving',
-            name='current_longitude',
-            field=models.DecimalField(decimal_places=7, default=0, max_digits=13, verbose_name='Longitude'),
+            model_name="wardriving",
+            name="current_longitude",
+            field=models.DecimalField(
+                decimal_places=7, default=0, max_digits=13, verbose_name="Longitude"
+            ),
         ),
     ]

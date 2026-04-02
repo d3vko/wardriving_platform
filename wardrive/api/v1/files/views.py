@@ -87,28 +87,29 @@ class DeviceSourceChoicesView(APIView):
 
     @swagger_auto_schema(
         operation_description="List allowed device_source values for the file upload endpoint.",
-        responses={200: openapi.Response(
-            description="List of choices",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    "device_source": openapi.Schema(
-                        type=openapi.TYPE_ARRAY,
-                        items=openapi.Schema(
-                            type=openapi.TYPE_OBJECT,
-                            properties={
-                                "value": openapi.Schema(type=openapi.TYPE_STRING),
-                                "label": openapi.Schema(type=openapi.TYPE_STRING),
-                            },
+        responses={
+            200: openapi.Response(
+                description="List of choices",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "device_source": openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "value": openapi.Schema(type=openapi.TYPE_STRING),
+                                    "label": openapi.Schema(type=openapi.TYPE_STRING),
+                                },
+                            ),
                         ),
-                    ),
-                },
-            ),
-        )},
+                    },
+                ),
+            )
+        },
     )
     def get(self, request):
         choices = [
-            {"value": value, "label": label}
-            for value, label in SourceDevice.CHOICES
+            {"value": value, "label": label} for value, label in SourceDevice.CHOICES
         ]
         return Response({"device_source": choices})

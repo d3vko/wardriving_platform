@@ -100,9 +100,9 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
     @action(methods=["get"], detail=False, url_path="kml")
     def download_kml(self, request, *args, **kwargs):
-        if not request.query_params.get("first_seen_after") or not request.query_params.get(
-            "first_seen_before"
-        ):
+        if not request.query_params.get(
+            "first_seen_after"
+        ) or not request.query_params.get("first_seen_before"):
             return Response(
                 {
                     "detail": (
@@ -117,7 +117,9 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         ).order_by("-first_seen")
         if not queryset.exists():
             return Response(
-                {"detail": "No WiFi samples to export for your user in this date range."},
+                {
+                    "detail": "No WiFi samples to export for your user in this date range."
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
         return build_kml_response(
@@ -151,8 +153,8 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filterset_class = LteWardrivingFilterSet
 
     def get_queryset(self):
-        return (
-            LTEWardriving.objects.filter(_exclude_default_coords()).order_by("-first_seen")
+        return LTEWardriving.objects.filter(_exclude_default_coords()).order_by(
+            "-first_seen"
         )
 
     @swagger_auto_schema(manual_parameters=list_params)
@@ -166,9 +168,9 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
     @action(methods=["get"], detail=False, url_path="kml")
     def download_kml(self, request, *args, **kwargs):
-        if not request.query_params.get("first_seen_after") or not request.query_params.get(
-            "first_seen_before"
-        ):
+        if not request.query_params.get(
+            "first_seen_after"
+        ) or not request.query_params.get("first_seen_before"):
             return Response(
                 {
                     "detail": (
@@ -183,7 +185,9 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         ).order_by("-first_seen")
         if not queryset.exists():
             return Response(
-                {"detail": "No LTE samples to export for your user in this date range."},
+                {
+                    "detail": "No LTE samples to export for your user in this date range."
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
         return build_kml_response(

@@ -2,6 +2,7 @@
 S3/MinIO client singleton for use across the project.
 Only instantiated when USE_S3_STORAGE is True and credentials are set.
 """
+
 import json
 import logging
 from typing import Any, Optional

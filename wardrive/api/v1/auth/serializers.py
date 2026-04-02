@@ -32,12 +32,16 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("Ya existe un usuario con este correo electronico.")
+            raise serializers.ValidationError(
+                "Ya existe un usuario con este correo electronico."
+            )
         return value.lower()
 
     def validate(self, attrs):
         if attrs["password"] != attrs.pop("password_confirm"):
-            raise serializers.ValidationError({"password_confirm": "Las contrasenas no coinciden."})
+            raise serializers.ValidationError(
+                {"password_confirm": "Las contrasenas no coinciden."}
+            )
         return attrs
 
     def create(self, validated_data):

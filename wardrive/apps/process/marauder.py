@@ -2,6 +2,7 @@
 Marauder / Flipper / ESP32 Marauder firmware file processors.
 Supports Flipper format (WiFi, BLE, mixed) and classic CSV format.
 """
+
 import logging
 import re
 import time
@@ -39,7 +40,6 @@ _SKIP_CONTAINS = (
     "Started BLE Scan",
     "wifi:can not get wifi protocol",
 )
-
 
 
 _PREAMBLE_LINES = 50

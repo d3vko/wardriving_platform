@@ -1,6 +1,7 @@
 """
 RF custom firmware (Lilygo T-SIM7000G) processors: LTE and WiFi wardriving.
 """
+
 import csv
 
 from pandas import DataFrame, read_csv, to_datetime, to_numeric, isna, notna
@@ -47,10 +48,7 @@ def process_lte_wardriving(
             dataframe[key.lower()] = dataframe.pop(key)
 
     dataframe["rssi"] = (
-        dataframe["rssi"]
-        .astype(str)
-        .str.replace(" dBm", "", regex=False)
-        .str.strip()
+        dataframe["rssi"].astype(str).str.replace(" dBm", "", regex=False).str.strip()
     )
     dataframe["rssi"] = to_numeric(dataframe["rssi"], errors="coerce")
     dataframe = dataframe.dropna(subset=["rssi"]).reset_index(drop=True)
@@ -122,9 +120,7 @@ def process_lte_wardriving(
 
 
 def _strip_column_names(df: DataFrame) -> None:
-    df.columns = [
-        str(c).strip().lstrip("\ufeff").strip() for c in df.columns
-    ]
+    df.columns = [str(c).strip().lstrip("\ufeff").strip() for c in df.columns]
 
 
 def _rf_wifi_csv_has_core_columns(df: DataFrame) -> bool:
@@ -267,9 +263,7 @@ def process_wifi_rf_wardriving(
             "mac": mac,
             "channel": to_numeric(channel, errors="coerce"),
             "rssi": to_numeric(
-                rssi_raw.astype(str)
-                .str.replace(" dBm", "", regex=False)
-                .str.strip(),
+                rssi_raw.astype(str).str.replace(" dBm", "", regex=False).str.strip(),
                 errors="coerce",
             ),
         }
@@ -322,9 +316,7 @@ def process_wifi_rf_wardriving(
         }
         if rec.get("altitude_meters") is not None and notna(rec.get("altitude_meters")):
             row["altitude_meters"] = rec["altitude_meters"]
-        if rec.get("accuracy_meters") is not None and notna(
-            rec.get("accuracy_meters")
-        ):
+        if rec.get("accuracy_meters") is not None and notna(rec.get("accuracy_meters")):
             row["accuracy_meters"] = rec["accuracy_meters"]
 
         row = {k: v for k, v in row.items() if v is not None}
@@ -410,13 +402,9 @@ def process_file_rf(
             )
     else:
         try:
-            df = read_csv(
-                file_path, encoding="utf-8", sep=",", low_memory=False
-            )
+            df = read_csv(file_path, encoding="utf-8", sep=",", low_memory=False)
         except UnicodeDecodeError:
-            df = read_csv(
-                file_path, encoding="latin-1", sep=",", low_memory=False
-            )
+            df = read_csv(file_path, encoding="latin-1", sep=",", low_memory=False)
 
     return cls_process(
         device_source=device_source, uploaded_by=uploaded_by, dataframe=df

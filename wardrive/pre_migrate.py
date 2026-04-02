@@ -5,6 +5,7 @@ Necesario al introducir AUTH_USER_MODEL = "users.User" en una BD existente donde
 auth_user ya existe. Se ejecuta desde start.sh ANTES de manage.py migrate.
 En deploys frescos o posteriores es un no-op.
 """
+
 import os
 import sys
 

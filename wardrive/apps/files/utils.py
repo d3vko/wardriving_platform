@@ -298,11 +298,7 @@ def bulk_upsert_by_keys(
     if nkeys == 0:
         return 0, 0, 0
 
-    tcs = (
-        transaction_chunk_size
-        if transaction_chunk_size is not None
-        else nkeys
-    )
+    tcs = transaction_chunk_size if transaction_chunk_size is not None else nkeys
     if tcs < 1:
         tcs = nkeys
 

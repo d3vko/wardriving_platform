@@ -6,12 +6,16 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('wardriving', '0012_alter_ltewardriving_options'),
+        ("wardriving", "0012_alter_ltewardriving_options"),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='wardriving',
-            index=models.Index(condition=models.Q(('deleted_at__isnull', True)), fields=['uploaded_by', 'mac', 'channel'], name='wardriving_up_mac_ch_alv'),
+            model_name="wardriving",
+            index=models.Index(
+                condition=models.Q(("deleted_at__isnull", True)),
+                fields=["uploaded_by", "mac", "channel"],
+                name="wardriving_up_mac_ch_alv",
+            ),
         ),
     ]

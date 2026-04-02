@@ -2,6 +2,7 @@
 Redis client singleton for use across the project.
 Only instantiated when REDIS_URL is set; otherwise get_redis_client() returns None.
 """
+
 from typing import Optional
 
 from redis import Redis

@@ -1,6 +1,7 @@
 """
 Centralized regex patterns for the project.
 """
+
 import re
 
 # -----------------------------

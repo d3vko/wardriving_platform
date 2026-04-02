@@ -1,6 +1,7 @@
 """
 Device-specific file processors. Each module handles one hardware family.
 """
+
 from .marauder import process_file_marauder_esp32
 from .minino import process_file_minino
 from .rf import process_file_rf
@@ -25,4 +26,9 @@ CHOICES_FUNCTION_PROCESS = {
     SourceDevice.OTHER: None,
 }
 
-__all__ = ["CHOICES_FUNCTION_PROCESS", "process_file_marauder_esp32", "process_file_minino", "process_file_rf"]
+__all__ = [
+    "CHOICES_FUNCTION_PROCESS",
+    "process_file_marauder_esp32",
+    "process_file_minino",
+    "process_file_rf",
+]

@@ -1,4 +1,5 @@
 """Unit tests for Flipper/Marauder log parsing (apps.process.marauder)."""
+
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
