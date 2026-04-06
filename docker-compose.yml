@@ -165,7 +165,7 @@ services:
   #   restart: on-failure
 
   wardrive_bi:
-    image: metabase/metabase:v0.59.5
+    image: metabase/metabase:v0.58.6
     env_file: .env
     volumes:
       - metabase_data:/metabase-data
