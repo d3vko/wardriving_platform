@@ -45,11 +45,6 @@ def process_file(self, file_pk, _uploaded_by_id=None, _device_source=None):
             uploaded_by=file_obj.uploaded_by,
         )
         total = new_added + updated + ignored
-        if total == 0:
-            return (
-                f"File {file_pk} - {file_obj}: no records parsed (0 new, 0 updated, 0 ignored). "
-                f"Left is_procesed=False so you can fix the log or device type and re-queue."
-            )
         file_obj.is_procesed = True
         file_obj.save()
         return f"File {file_pk} - {file_obj} processed successfully. Total of records in file {total}, Total new records {new_added}, Total updated found records {updated}, Total ignored {ignored}"
