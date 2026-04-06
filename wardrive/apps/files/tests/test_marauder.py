@@ -14,13 +14,14 @@ from apps.process.marauder import (
 
 
 class DetectFlipperMarauderStyleTests(SimpleTestCase):
-    def test_header_startingwardrive_forces_classic(self):
+    def test_header_startingwardrive_mixed_is_indexed(self):
+        """StartingWardrive = mixed WiFi+BLE; data lines are often ``N | …`` indexed."""
         lines = [
             "# log\n",
             "StartingWardrive. Stop with stopscan\n",
             "1 | aa:bb:cc:dd:ee:ff,x,[OPEN],,2,-50,1,2,3,4,5,WIFI\n",
         ]
-        self.assertEqual(_detect_flipper_marauder_log_style(lines), "classic")
+        self.assertEqual(_detect_flipper_marauder_log_style(lines), "indexed")
 
     def test_header_starting_wardrive_forces_indexed(self):
         lines = [
@@ -98,3 +99,18 @@ class ProcessFormatV2MockTests(SimpleTestCase):
         ]
         process_format_flipper_marauder_v2(lines=lines, uploaded_by="t")
         _mock_bulk.assert_called_once()
+
+    @patch("apps.process.marauder.bulk_upsert_by_keys", return_value=(1, 0, 0))
+    def test_v2_startingwardrive_plus_gt_indexed_wifi_rows(self, mock_bulk):
+        lines = [
+            "#wardrive -serial\n",
+            "StartingWardrive. Stop with stopscan\n",
+            "> 1 | 78:8c:b5:1a:29:d4,Area,[WPA2_PSK],2026-04-05 18:46:47,10,-42,"
+            "19.4112186,-99.1793900,2258.40,5.00,WIFI\n",
+            "2 | 50:91:e3:9c:be:af,TP,[WPA2_PSK],2026-04-05 18:46:47,4,-46,"
+            "19.4112186,-99.1793900,2258.40,5.00,WIFI\n",
+        ]
+        process_format_flipper_marauder_v2(lines=lines, uploaded_by="u")
+        mock_bulk.assert_called_once()
+        rows = mock_bulk.call_args.kwargs["rows"]
+        self.assertGreaterEqual(len(rows), 2)

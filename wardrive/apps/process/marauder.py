@@ -24,9 +24,11 @@ from apps.wardriving.models import Wardriving, SourceDevice
 
 logger = logging.getLogger(__name__)
 
-# Header fingerprints (line ~2 in common exports): v2 uses typo without space; v1 uses two words.
-_HEADER_CLASSIC_V2 = "StartingWardrive"
-_HEADER_INDEXED_V1 = "Starting Wardrive"
+# Header fingerprints (line ~2 in common exports).
+# "StartingWardrive" (no space) = mixed WiFi+BLE in one wardrive session (not "CSV classic only").
+# "Starting Wardrive" (two words) = separated / alternate wardrive mode on some firmware builds.
+_HEADER_MIXED_WIFI_BLE = "StartingWardrive"
+_HEADER_SEPARATED_V1 = "Starting Wardrive"
 
 # parser_fn(line) must return None or an 11-tuple:
 # (mac, ssid_or_name, auth_mode, first_seen, channel, rssi, lat, lon, alt, acc, data_type)
@@ -34,8 +36,8 @@ _HEADER_INDEXED_V1 = "Starting Wardrive"
 
 _SKIP_CONTAINS = (
     "stopscan",
-    _HEADER_INDEXED_V1,
-    _HEADER_CLASSIC_V2,
+    _HEADER_SEPARATED_V1,
+    _HEADER_MIXED_WIFI_BLE,
     "Starting Continuous BT Wardrive",
     "Started BLE Scan",
     "wifi:can not get wifi protocol",
@@ -217,9 +219,12 @@ def _parse_marauder_line_flipper_indexed_chain(line: str):
 
 def _detect_flipper_marauder_log_style(lines):
     """
-    Return 'classic' (v2 CSV) or 'indexed' (v1 with 'N |').
+    Return 'classic' (CSV starting with MAC) or 'indexed' (Flipper ``N |`` / BLE patterns).
 
-    Phase A: preamble lines may contain StartingWardrive (v2) vs Starting Wardrive (v1).
+    ``StartingWardrive`` (no space) marks a **mixed** WiFi+BLE log; data lines are often still
+    indexed ``N | …`` — never classify that header as classic-only.
+
+    Phase A: mixed header → indexed; separated header (two words) → indexed.
     Phase B: first non-noise data line: classic regex, indexed prefix, or Flipper patterns.
     """
     preamble = lines[:_PREAMBLE_LINES]
@@ -227,13 +232,13 @@ def _detect_flipper_marauder_log_style(lines):
         s = line.strip()
         if not s:
             continue
-        if _HEADER_CLASSIC_V2 in s:
-            return "classic"
+        if _HEADER_MIXED_WIFI_BLE in s:
+            return "indexed"
     for line in preamble:
         s = line.strip()
         if not s:
             continue
-        if _HEADER_INDEXED_V1 in s:
+        if _HEADER_SEPARATED_V1 in s:
             return "indexed"
 
     for line in lines[:_MAX_LINES_STYLE_DETECT]:
@@ -393,19 +398,14 @@ def process_format_flipper_marauder_v2(
     uploaded_by="Without Owner",
 ):
     """
-    Mixed Marauder output (BLE + WiFi). Detects classic CSV vs indexed Flipper format
-    (header and/or first data lines), then runs the appropriate parser chain on all lines.
+    Mixed Marauder output (BLE + WiFi). Parses every line with the Flipper chain: try BLE,
+    indexed WiFi (``N |`` / V3), then classic CSV — so mixed headers like ``StartingWardrive``
+    plus indexed rows are handled without mis-detecting the whole file as classic-only.
     """
     lines = lines or []
-    style = _detect_flipper_marauder_log_style(lines)
-    parser_fn = (
-        _parse_marauder_line_classic
-        if style == "classic"
-        else _parse_marauder_line_flipper_indexed_chain
-    )
     return _process_format_flipper_marauder_core(
         lines=lines,
-        parser_fn=parser_fn,
+        parser_fn=_parse_marauder_line_flipper_indexed_chain,
         device_source=device_source,
         uploaded_by=uploaded_by,
     )
@@ -452,10 +452,14 @@ def process_file_marauder_esp32(
         with open(file_path, "r", encoding="latin-1") as f:
             lines = f.readlines()
 
+    _v2 = process_format_flipper_marauder_v2
     esp32_class_process = {
-        SourceDevice.FLIPPER_DEV_BOARD: process_format_flipper_marauder_v2,
-        SourceDevice.FLIPPER_DEV_BOARD_PRO: process_format_flipper_marauder_v2,
-        SourceDevice.KIISU: process_format_flipper_marauder_v2,
+        SourceDevice.FLIPPER_DEV_BOARD: _v2,
+        SourceDevice.FLIPPER_DEV_BOARD_PRO: _v2,
+        SourceDevice.KIISU: _v2,
+        SourceDevice.MARAUDER_V4: _v2,
+        SourceDevice.MARAUDER_V6: _v2,
+        SourceDevice.FLIPPER_BFFB: _v2,
     }
     cls_process = esp32_class_process.get(
         device_source, process_format_classic_marauder
