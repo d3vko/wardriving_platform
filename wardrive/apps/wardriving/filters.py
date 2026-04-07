@@ -7,18 +7,10 @@ from apps.wardriving.models import LTEWardriving
 
 class _FirstSeenDateRangeMixin:
     """
-    ``first_seen_after`` / ``first_seen_before`` are normalized to the start and end of the
-    calendar day in the value's timezone (or TIME_ZONE if naive).
+    Métodos de normalización de rango de fechas para ``first_seen_after`` /
+    ``first_seen_before``. Los filtros concretos deben declararse en cada
+    FilterSet hijo para que la metaclase de django-filter los registre.
     """
-
-    first_seen_after = filters.DateTimeFilter(
-        field_name="first_seen",
-        method="filter_first_seen_after",
-    )
-    first_seen_before = filters.DateTimeFilter(
-        field_name="first_seen",
-        method="filter_first_seen_before",
-    )
 
     def filter_first_seen_after(self, queryset, name, value):
         if value is None:
@@ -35,6 +27,14 @@ class WifiWardrivingFilterSet(_FirstSeenDateRangeMixin, filters.FilterSet):
     """Optional filters for the WiFi map list (SQL view ``wardriving_vendor``)."""
 
     uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
+    first_seen_after = filters.DateTimeFilter(
+        field_name="first_seen",
+        method="filter_first_seen_after",
+    )
+    first_seen_before = filters.DateTimeFilter(
+        field_name="first_seen",
+        method="filter_first_seen_before",
+    )
 
     class Meta:
         model = WardrivingVendorView
@@ -45,6 +45,14 @@ class LteWardrivingFilterSet(_FirstSeenDateRangeMixin, filters.FilterSet):
     """Optional filters for LTE (``LTEWardriving`` model)."""
 
     uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
+    first_seen_after = filters.DateTimeFilter(
+        field_name="first_seen",
+        method="filter_first_seen_after",
+    )
+    first_seen_before = filters.DateTimeFilter(
+        field_name="first_seen",
+        method="filter_first_seen_before",
+    )
 
     class Meta:
         model = LTEWardriving
