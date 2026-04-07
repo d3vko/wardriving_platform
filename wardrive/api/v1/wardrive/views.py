@@ -86,7 +86,7 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     pagination_class = MapPlacesPagination
     filter_backends = [filters.DjangoFilterBackend]
     filterset_class = WifiWardrivingFilterSet
-    queryset = WardrivingVendorView.objects.order_by("id")
+    queryset = WardrivingVendorView.objects.order_by("-id")
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
