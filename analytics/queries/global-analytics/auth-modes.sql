@@ -1,4 +1,4 @@
-{@config ttl = 60}
+{@config ttl = 600}
 
 -- Rango de fechas sobre wardriving_vendor.first_seen (timestamptz en PostgreSQL)
 -- Formato ISO 8601 con offset de zona horaria, p.ej. 2025-01-01T00:00:00-06:00
