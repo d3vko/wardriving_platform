@@ -25,7 +25,7 @@ class MultipleFileUploadedCreateSerializer(serializers.Serializer):
         child=serializers.FileField(),
         write_only=True,
     )
-    device_source = serializers.ChoiceField(choices=SourceDevice.CHOICES)
+    device_source = serializers.ChoiceField(choices=SourceDevice.AVAILABLE_CHOICES)
 
     def create(self, validated_data):
         files = validated_data.pop("files")

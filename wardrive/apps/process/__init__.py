@@ -5,6 +5,7 @@ Device-specific file processors. Each module handles one hardware family.
 from .marauder import process_file_marauder_esp32
 from .minino import process_file_minino
 from .rf import process_file_rf
+from .wiggle import process_file_wiggle_mobile_wifi
 
 from apps.wardriving import SourceDevice
 
@@ -23,6 +24,7 @@ CHOICES_FUNCTION_PROCESS = {
     SourceDevice.WARDRIVER_UK: process_file_marauder_esp32,
     SourceDevice.KIISU: process_file_marauder_esp32,
     SourceDevice.PWNTERREY_MARAUDER: process_file_minino,
+    SourceDevice.WIGGLE_MOBILE_WIFI: process_file_wiggle_mobile_wifi,
     SourceDevice.OTHER: None,
 }
 
@@ -31,4 +33,5 @@ __all__ = [
     "process_file_marauder_esp32",
     "process_file_minino",
     "process_file_rf",
+    "process_file_wiggle_mobile_wifi",
 ]

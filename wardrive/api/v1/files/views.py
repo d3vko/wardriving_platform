@@ -22,7 +22,7 @@ from apps.wardriving import SourceDevice
 from api.utils import is_swagger_fake_view
 from api.pagination import CustomPagination
 
-DEVICE_SOURCE_VALUES = [value for value, _ in SourceDevice.CHOICES]
+DEVICE_SOURCE_VALUES = [value for value, _ in SourceDevice.AVAILABLE_CHOICES]
 
 upload_params = [
     openapi.Parameter(
@@ -110,6 +110,6 @@ class DeviceSourceChoicesView(APIView):
     )
     def get(self, request):
         choices = [
-            {"value": value, "label": label} for value, label in SourceDevice.CHOICES
+            {"value": value, "label": label} for value, label in SourceDevice.AVAILABLE_CHOICES
         ]
         return Response({"device_source": choices})
