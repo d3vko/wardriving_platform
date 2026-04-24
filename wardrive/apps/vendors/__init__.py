@@ -7,3 +7,4 @@ class SourceVendor:
         (MIRROR, MIRROR),
         (MANUAL, MANUAL),
     )
+
