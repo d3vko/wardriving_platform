@@ -30,8 +30,8 @@ import dayjs, { type Dayjs } from 'dayjs'
 
 import 'leaflet/dist/leaflet.css'
 
-/** Puntos visibles por “página” del mapa máx 1000 pines. */
-const VIEW_SIZE = 1000
+/** Puntos visibles por “página” del mapa máx 750 pines. */
+const VIEW_SIZE = 750
 const BATCH_SIZE = 250
 const BATCHES_PER_VIEW = VIEW_SIZE / BATCH_SIZE
 
