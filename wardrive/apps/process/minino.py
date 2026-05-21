@@ -1,125 +1,86 @@
 """
-Minino (Electronic Cats) device file processor.
+Minino (Electronic Cats) and PwnTerrey Marauder file processor.
+
+Uses the shared canonical pipeline:
+  resolve_headers → coerce_row → persist_canonical_rows
+
+coerce_row() handles automatically:
+  - auth_mode bracket sanitization: [WPA2-PSK-CCMP][ESS] → "WPA2-PSK-CCMP"
+  - SSID empty / whitespace / "nan" sentinel → None
+  - Type normalization (WIFI, BLE, BT)
+
+dtype=str + keep_default_na=False prevent pandas from silently converting
+empty cells to float NaN which would later be stored as the string "nan".
 """
 
-from datetime import datetime
-from decimal import Decimal
+from __future__ import annotations
 
-from pandas import read_csv, to_datetime, isna, notna
+import logging
 
-from django.utils.timezone import make_aware, is_naive
+from pandas import read_csv
 
-from apps.files.utils import bulk_upsert_by_keys, wardriving_better_obj_fn
-from apps.wardriving.models import Wardriving, SourceDevice
+from apps.process._wigle_canonical.aliases import resolve_headers
+from apps.process._wigle_canonical.persist import persist_canonical_rows
+from apps.process._wigle_canonical.schema import CanonicalRow, coerce_row
+from apps.wardriving.models import SourceDevice
+
+logger = logging.getLogger(__name__)
 
 
 def process_file_minino(
-    file_path="",
-    device_source=SourceDevice.MININO,
-    uploaded_by="Without Owner",
-):
+    file_path: str = "",
+    device_source: str = SourceDevice.MININO,
+    uploaded_by: str = "Without Owner",
+) -> tuple[int, int, int]:
     """
-    Process Minino CSV export.
-    Header: MAC,SSID,AuthMode,FirstSeen,Channel,Frequency,RSSI,CurrentLatitude,...
+    Process Minino / PwnTerrey Marauder CSV export.
+
+    Line 1: metadata (WigleWifi-style or device header) — skipped via skiprows=1.
+    Line 2: column headers (MAC, SSID, AuthMode, FirstSeen, Channel, …).
+
+    Supports alias variants via resolve_headers() (BSSID, Capabilities, etc.)
+    and applies sanitize_security() automatically through coerce_row().
     """
     try:
-        df = read_csv(file_path, encoding="utf-8", skiprows=1, on_bad_lines="skip")
+        df = read_csv(
+            file_path,
+            encoding="utf-8",
+            skiprows=1,
+            on_bad_lines="skip",
+            dtype=str,
+            keep_default_na=False,
+        )
     except UnicodeDecodeError:
-        df = read_csv(file_path, encoding="latin-1", skiprows=1, on_bad_lines="skip")
+        df = read_csv(
+            file_path,
+            encoding="latin-1",
+            skiprows=1,
+            on_bad_lines="skip",
+            dtype=str,
+            keep_default_na=False,
+        )
 
-    deleted_rows = ["Frequency", "RCOIs", "MfgrId"]
-    renamed_headers = {
-        "MAC": "mac",
-        "SSID": "ssid",
-        "AuthMode": "auth_mode",
-        "FirstSeen": "first_seen",
-        "Channel": "channel",
-        "RSSI": "rssi",
-        "CurrentLatitude": "current_latitude",
-        "CurrentLongitude": "current_longitude",
-        "AltitudeMeters": "altitude_meters",
-        "AccuracyMeters": "accuracy_meters",
-        "Type": "type",
-    }
+    if df.empty:
+        return 0, 0, 0
 
-    df = df.drop(columns=[col for col in deleted_rows if col in df.columns])
-    df.rename(columns=renamed_headers, inplace=True)
+    header_map = resolve_headers(list(df.columns))
 
-    if "first_seen" in df:
-        fs = to_datetime(df["first_seen"], errors="coerce")
-        df["first_seen"] = fs
+    if not header_map.get("mac") or not header_map.get("channel"):
+        logger.warning(
+            "minino: required columns (mac/channel) not found. "
+            "Available: %s",
+            list(df.columns),
+        )
+        return 0, 0, 0
 
-    rows = []
-    for _, row in df.iterrows():
-        mac = row.get("mac")
-        channel = row.get("channel")
-        if isna(mac) or isna(channel):
-            continue
+    canonical_rows: list[CanonicalRow] = []
+    for _, pandas_row in df.iterrows():
+        canonical = coerce_row(pandas_row.to_dict(), header_map)
+        if canonical is not None:
+            canonical_rows.append(canonical)
 
-        first_seen = row.get("first_seen")
-        if isna(first_seen):
-            first_seen = None
-        elif hasattr(first_seen, "to_pydatetime"):
-            first_seen = first_seen.to_pydatetime()
-            if is_naive(first_seen):
-                first_seen = make_aware(first_seen)
-        elif isinstance(first_seen, datetime):
-            if is_naive(first_seen):
-                first_seen = make_aware(first_seen)
-
-        rssi_val = int(row["rssi"]) if "rssi" in row and notna(row["rssi"]) else None
-
-        payload = {
-            "uploaded_by": uploaded_by,
-            "mac": mac,
-            "channel": int(channel),
-            "ssid": (row.get("ssid") or None),
-            "auth_mode": (row.get("auth_mode") or None),
-            "first_seen": first_seen,
-            "current_latitude": (
-                Decimal(row["current_latitude"])
-                if notna(row.get("current_latitude"))
-                else None
-            ),
-            "current_longitude": (
-                Decimal(row["current_longitude"])
-                if notna(row.get("current_longitude"))
-                else None
-            ),
-            "altitude_meters": (
-                Decimal(row["altitude_meters"])
-                if notna(row.get("altitude_meters"))
-                else None
-            ),
-            "accuracy_meters": (
-                Decimal(row["accuracy_meters"])
-                if notna(row.get("accuracy_meters"))
-                else None
-            ),
-            "type": (row.get("type") or "WIFI"),
-            "rssi": rssi_val,
-            "device_source": device_source,
-        }
-        payload = {k: v for k, v in payload.items() if v is not None}
-        rows.append(payload)
-
-    return bulk_upsert_by_keys(
-        model=Wardriving,
-        key_fields=["uploaded_by", "mac", "channel"],
-        rows=rows,
-        better_obj_fn=wardriving_better_obj_fn,
-        update_fields=[
-            "ssid",
-            "auth_mode",
-            "first_seen",
-            "current_latitude",
-            "current_longitude",
-            "altitude_meters",
-            "accuracy_meters",
-            "type",
-            "rssi",
-            "device_source",
-        ],
-        only_fields=["id", "uploaded_by", "mac", "channel", "rssi"],
-        chunk_size=1000,
+    return persist_canonical_rows(
+        canonical_rows,
+        device_source=device_source,
+        uploaded_by=uploaded_by,
     )
