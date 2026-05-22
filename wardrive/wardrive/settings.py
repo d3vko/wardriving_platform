@@ -67,7 +67,7 @@ ROOT_URLCONF = "wardrive.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -231,6 +231,58 @@ else:
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
     }
+# ----- Email / SMTP -----
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env("EMAIL_PORT", default=587, cast=int)
+EMAIL_USE_TLS = env("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@example.com")
+
+# ----- Email branding (used in HTML templates) -----
+EMAIL_SITE_NAME = env("EMAIL_SITE_NAME", default="Wardrive")
+EMAIL_SUPPORT_EMAIL = env("EMAIL_SUPPORT_EMAIL", default="")
+# Absolute URL of the logo image shown in email header
+EMAIL_LOGO_URL = env("EMAIL_LOGO_URL", default="")
+
+
+def _env_multiline(key: str, default: str) -> str:
+    """Read an env var and convert literal \\n sequences to real newlines (mirrors Vite's parseEnvMultiline)."""
+    return env(key, default=default).replace("\\n", "\n")
+
+
+# Welcome email — configurable copy (use \n in .env to produce line breaks / list items)
+EMAIL_WELCOME_INTRO = _env_multiline(
+    "EMAIL_WELCOME_INTRO",
+    (
+        "Bienvenido a la plataforma del CTF de wardriving.\n"
+        "Tu cuenta está lista: aquí podrás participar subiendo capturas y consultando los resultados del evento."
+    ),
+)
+EMAIL_WELCOME_FEATURES = _env_multiline(
+    "EMAIL_WELCOME_FEATURES",
+    (
+        "Subir archivos de captura (Upload)\n"
+        "Explorar mapas de wardriving WiFi y LTE\n"
+        "Revisar analytics del evento\n"
+        "Descargar exportaciones KML"
+    ),
+)
+
+# ----- Password reset via API (SPA) -----
+# Full base URL including basename, e.g. https://host/ctf
+# Falls back to the first CSRF_TRUSTED_ORIGINS entry + FORCE_SCRIPT_NAME (dev only).
+_reset_base_fallback = ""
+PASSWORD_RESET_FRONTEND_BASE_URL = env("PASSWORD_RESET_FRONTEND_BASE_URL", default=_reset_base_fallback)
+PASSWORD_RESET_PATH = env("PASSWORD_RESET_PATH", default="reset-password")
+
+# URL used in welcome email "go to app" button
+FRONTEND_LOGIN_URL = env("FRONTEND_LOGIN_URL", default="")
+
 # Related to documentation
 SWAGGER_EMAIL = env("SWAGGER_EMAIL", default="example@mail.com")
 SWAGGER_AUTHOR = env("SWAGGER_AUTHOR", default="not specified")

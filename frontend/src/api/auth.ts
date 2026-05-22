@@ -50,3 +50,24 @@ export function refreshToken(refresh: string): Promise<RefreshResponse> {
     skipAuth: true,
   })
 }
+
+export function requestPasswordReset(email: string): Promise<{ detail: string }> {
+  return apiFetch<{ detail: string }>('/auth/password/reset/', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+    skipAuth: true,
+  })
+}
+
+export function confirmPasswordReset(
+  uid: string,
+  token: string,
+  new_password: string,
+  new_password_confirm: string,
+): Promise<{ detail: string }> {
+  return apiFetch<{ detail: string }>('/auth/password/reset/confirm/', {
+    method: 'POST',
+    body: JSON.stringify({ uid, token, new_password, new_password_confirm }),
+    skipAuth: true,
+  })
+}

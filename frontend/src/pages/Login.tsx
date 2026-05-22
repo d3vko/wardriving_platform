@@ -22,21 +22,21 @@ export default function Login() {
   const location = useLocation()
   const from = (location.state as { from?: string })?.from ?? '/'
 
-  const [username, setUsername] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password) return
+    if (!identifier.trim() || !password) return
     setError(null)
     setLoading(true)
     try {
-      await login(username.trim(), password)
+      await login(identifier.trim(), password)
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Failed to sign in')
+      setError(err instanceof ApiError ? err.detail : 'Error al iniciar sesión')
     } finally {
       setLoading(false)
     }
@@ -70,7 +70,7 @@ export default function Login() {
             Wardrive
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Sign in to continue
+            Inicia sesión para continuar
           </Typography>
         </Stack>
 
@@ -83,16 +83,16 @@ export default function Login() {
         <Box component="form" onSubmit={handleSubmit}>
           <Stack spacing={2}>
             <TextField
-              label="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              label="Usuario o correo"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               autoFocus
               fullWidth
               autoComplete="username"
               disabled={loading}
             />
             <TextField
-              label="Password"
+              label="Contraseña"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -100,15 +100,20 @@ export default function Login() {
               autoComplete="current-password"
               disabled={loading}
             />
+            <Box textAlign="right" mt={-1}>
+              <Link component={RouterLink} to="/forgot-password" variant="body2" underline="hover">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </Box>
             <Button
               type="submit"
               variant="contained"
               size="large"
               fullWidth
-              disabled={loading || !username.trim() || !password}
+              disabled={loading || !identifier.trim() || !password}
               startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
             >
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
             </Button>
           </Stack>
         </Box>
@@ -116,9 +121,9 @@ export default function Login() {
         <Divider sx={{ my: 3 }} />
 
         <Typography variant="body2" color="text.secondary" textAlign="center">
-          Don&apos;t have an account?{' '}
+          ¿No tienes cuenta?{' '}
           <Link component={RouterLink} to="/register" underline="hover">
-            Register
+            Regístrate
           </Link>
         </Typography>
       </Paper>
