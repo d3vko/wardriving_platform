@@ -20,22 +20,40 @@ def process_lte_wardriving(
     dataframe=None,
 ):
     """
-    Process LTE wardriving CSV from Lilygo T-SIM7000G.
-    Header example (device may output Spanish column names):
-    Timestamp,Tecnología,Estado,MCC,MNC,LAC,CellID,Banda,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
+    Process LTE wardriving CSV from Lilygo T-SIM7000G or Android scanner apps.
+
+    Accepts both Spanish (RF firmware) and English (Android) column names:
+      Spanish: Timestamp, Tecnología, Estado, MCC, MNC, LAC, CellID, Banda,
+               RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud
+      English: Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band,
+               RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude
+
+    Placeholder / unserved-cell rows are filtered out before upsert:
+      - CellID == 268435455  (0x0FFFFFFF sentinel for "no cell")
+      - LAC    == 65535      (0xFFFF sentinel for "no LAC")
+      - MCC    == 0          (invalid country code)
+      - Rows with empty Latitude or Longitude (no GPS fix)
     """
     dataframe = dataframe if dataframe is not None else DataFrame()
     if dataframe.empty:
         return 0, 0, 0
 
-    pop_keys = ["Timestamp", "Estado"]
+    # Drop columns that carry no model-relevant data (both languages)
+    pop_keys = ["Timestamp", "Estado", "State"]
     renamed_keys = {
+        # Spanish → canonical
+        "Tecnología": "tech",
         "CellID": "cell_id",
         "Banda": "band",
         "Operador": "provider",
         "Longitud": "current_longitude",
         "Latitud": "current_latitude",
-        "Tecnología": "tech",
+        # English → canonical (Android)
+        "Technology": "tech",
+        "Band": "band",
+        "Operator": "provider",
+        "Longitude": "current_longitude",
+        "Latitude": "current_latitude",
     }
     downcase_keys = ["MCC", "MNC", "LAC", "RSSI", "RSRP", "RSRQ", "SINR"]
 
@@ -54,6 +72,32 @@ def process_lte_wardriving(
     dataframe = dataframe.dropna(subset=["rssi"]).reset_index(drop=True)
     dataframe["rssi"] = dataframe["rssi"].astype(int)
     dataframe["provider"] = dataframe["provider"].fillna("Not Provided")
+
+    # Coerce key identifier columns to numeric so sentinel comparisons work
+    # regardless of whether the CSV was read as str or int.
+    for _col in ("cell_id", "lac", "mcc"):
+        if _col in dataframe.columns:
+            dataframe[_col] = to_numeric(dataframe[_col], errors="coerce")
+
+    # Filter placeholder / unserved-cell rows:
+    #   CellID 268435455 (0x0FFFFFFF) — no cell locked
+    #   LAC    65535     (0xFFFF)     — no LAC
+    #   MCC    0         — invalid country code
+    #   Missing lat/lon  — no GPS fix
+    if "cell_id" in dataframe.columns:
+        dataframe = dataframe[dataframe["cell_id"] != 268435455]
+    if "lac" in dataframe.columns:
+        dataframe = dataframe[dataframe["lac"] != 65535]
+    if "mcc" in dataframe.columns:
+        dataframe = dataframe[dataframe["mcc"] != 0]
+    for _coord in ("current_latitude", "current_longitude"):
+        if _coord in dataframe.columns:
+            dataframe[_coord] = to_numeric(dataframe[_coord], errors="coerce")
+            dataframe = dataframe.dropna(subset=[_coord])
+
+    dataframe = dataframe.reset_index(drop=True)
+    if dataframe.empty:
+        return 0, 0, 0
 
     rows = []
     for instance_data in dataframe.to_dict(orient="records"):

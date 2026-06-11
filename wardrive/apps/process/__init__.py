@@ -2,6 +2,7 @@
 Device-specific file processors. Each module handles one hardware family.
 """
 
+from .android import process_file_lte_android, process_file_wifi_ble_android
 from .marauder import process_file_marauder_esp32
 from .minino import process_file_minino
 from .rf import process_file_rf
@@ -25,13 +26,17 @@ CHOICES_FUNCTION_PROCESS = {
     SourceDevice.KIISU: process_file_marauder_esp32,
     SourceDevice.PWNTERREY_MARAUDER: process_file_minino,
     SourceDevice.WIGGLE_MOBILE_WIFI: process_file_wiggle_mobile_wifi,
+    SourceDevice.WIFI_BLE_ANDROID: process_file_wifi_ble_android,
+    SourceDevice.LTE_ANDROID: process_file_lte_android,
     SourceDevice.OTHER: None,
 }
 
 __all__ = [
     "CHOICES_FUNCTION_PROCESS",
+    "process_file_lte_android",
     "process_file_marauder_esp32",
     "process_file_minino",
     "process_file_rf",
     "process_file_wiggle_mobile_wifi",
+    "process_file_wifi_ble_android",
 ]

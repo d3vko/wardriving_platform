@@ -10,50 +10,62 @@ and compete using wireless data gathered from various supported devices.
 
 ```mermaid
 flowchart TB
-  subgraph "Client"
-    User[User / API client]
+  subgraph Sources["Data Sources"]
+    AndroidWifi["Android WiFi/BLE app\n(wifi_ble_android CSV)"]
+    AndroidLTE["Android LTE scanner app\n(lte_android CSV)"]
+    HWDevice["Hardware device\n(Marauder / Minino / RF / etc.)"]
   end
 
-  subgraph "Edge"
-    Nginx[nginx :8000]
+  subgraph Clients["Clients"]
+    Browser["Browser / API client"]
   end
 
-  subgraph "Applications"
-    Wardrive[Django Wardrive API]
-    CTFd[CTFd /ctf]
-    Metabase[Metabase BI]
+  subgraph Edge["Edge"]
+    Nginx["nginx :8000"]
   end
 
-  subgraph "Data & Storage"
-    PG[(PostgreSQL)]
-    Redis[(Redis)]
-    MinIO[MinIO S3]
+  subgraph Applications["Applications"]
+    Wardrive["Django Wardrive API\n/wardriving/"]
+    Frontend["wardrive-frontend SPA\n/ctf/"]
+    Metabase["Metabase BI\n/"]
+    Analytics["Analytics / Latitude\n/analytics/"]
   end
 
-  subgraph "Message Queue"
-    RabbitMQ[RabbitMQ]
+  subgraph Storage["Data & Storage"]
+    PG[("PostgreSQL")]
+    Redis[("Redis")]
+    MinIO["MinIO S3"]
   end
 
-  subgraph "Workers"
-    Celery0[Celery proc_0]
-    Celery1[Celery proc_1]
-    Beat[Celery Beat]
+  subgraph Queue["Message Queue"]
+    RabbitMQ["RabbitMQ"]
   end
 
-  User --> Nginx
+  subgraph Workers["Workers"]
+    Celery0["Celery proc_0"]
+    Celery1["Celery proc_1"]
+    Beat["Celery Beat"]
+  end
+
+  AndroidWifi -->|"POST /api/v1/files-uploaded/"| Wardrive
+  AndroidLTE -->|"POST /api/v1/files-uploaded/"| Wardrive
+  HWDevice -->|"POST /api/v1/files-uploaded/"| Wardrive
+
+  Browser --> Nginx
   Nginx --> Wardrive
-  Nginx --> CTFd
+  Nginx --> Frontend
   Nginx --> Metabase
+  Nginx --> Analytics
+
+  Frontend -->|"REST / JWT"| Wardrive
 
   Wardrive --> PG
   Wardrive --> MinIO
   Wardrive --> RabbitMQ
   Wardrive --> Redis
 
-  CTFd --> PG
-  CTFd --> MinIO
-
   Metabase --> PG
+  Analytics --> PG
 
   RabbitMQ --> Celery0
   RabbitMQ --> Celery1
@@ -108,11 +120,11 @@ Quick overview of the technologies used:
 
 ## 🔧 Wireless Technologies
 
-Compatible firmwares supported by this application:
+Compatible firmwares and data sources supported by this application:
 
--   **WiFi:** RF Village MX, Marauder ESP32, Minino, Wardriver UK
--   **BLE:** Marauder ESP32
--   **LTE:** RF Village MX
+-   **WiFi:** RF Village MX, Marauder ESP32, Minino, Wardriver UK, Android apps (`wifi_ble_android`)
+-   **BLE:** Marauder ESP32, Android apps (`wifi_ble_android` — rows without channel are discarded)
+-   **LTE:** RF Village MX, Android LTE scanner apps (`lte_android`)
 
 > 💡 *Want to request support for an additional technology?*
 > Open an Issue and include the header format so it can be added in a
@@ -130,8 +142,10 @@ You may also upload logs following:
 
 -   **WiGLE WiFi CSV (e.g. v1.4)** — first line is metadata (`WigleWifi-1.4`, often with `appRelease=ESP32Marauder`); the **next** line is the header row (`MAC`, `SSID`, `AuthMode`, `FirstSeen`, `Channel`, `RSSI`, `CurrentLatitude`, `CurrentLongitude`, `AltitudeMeters`, `AccuracyMeters`, `Type`). When uploading, set **`device_source`** to **`minino`** or **`rf custom firmware wifi`** so the CSV is read with `skiprows=1` and the correct column mapping (`apps.process.minino` / `apps.process.rf`). **Do not** use **`marauder esp32`** or other Flipper/Marauder log options for this file type: those run `process_file_marauder_esp32`, which expects **line-based wardrive logs**, not a WiGLE spreadsheet export.
 -   Minino device outputs (same CSV shape as above; also available as **`pwnterrey marauder`** in this project when you want event-specific labeling while reusing the Minino processor).
+-   **Android WiFi/BLE CSV (`wifi_ble_android`)** — exported from Android wardriving apps. The header is on **line 1** (no metadata line), same WiGLE column layout: `MAC, SSID, AuthMode, FirstSeen, Channel, RSSI, CurrentLatitude, CurrentLongitude, AltitudeMeters, AccuracyMeters, Type`. BLE rows without a `Channel` value are **discarded** (not persisted).
+-   **Android LTE CSV (`lte_android`)** — exported from Android LTE/cell scanner apps. English headers: `Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band, RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude`. Placeholder/unserved rows (`CellID=555555`, `LAC=555555`, `MCC=0`, or no GPS fix) are automatically filtered out.
 
-Both WiGLE-style CSV paths above are directly compatible with the processing system.
+All WiGLE-style CSV paths above are directly compatible with the processing system.
 
 ------------------------------------------------------------------------
 
@@ -150,6 +164,14 @@ Both WiGLE-style CSV paths above are directly compatible with the processing sys
 -   📶 **LILYGO T-SIM7000G-16MB (custom firmware)**
     Options: `rf custom firmware wifi`, `rf custom firmware lte`
     *(Firmware not provided --- happy hacking!)*
+
+-   📱 **Android WiFi/BLE scanner apps** (e.g. WiGLE WiFi): `wifi_ble_android`
+    CSV export with header on line 1 (`MAC, SSID, AuthMode, FirstSeen, Channel, RSSI, CurrentLatitude, CurrentLongitude, AltitudeMeters, AccuracyMeters, Type`).
+    BLE rows without a `Channel` are discarded automatically.
+
+-   📡 **Android LTE/cell scanner apps**: `lte_android`
+    CSV export with English headers (`Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band, RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude`).
+    Placeholder rows (`CellID=555555`, `LAC=555555`, `MCC=0`) and rows without GPS coordinates are filtered automatically.
 
 ------------------------------------------------------------------------
 
@@ -265,6 +287,8 @@ Upload logs through DRF:
 | `device_source` | Use for |
 | --- | --- |
 | `minino`, `rf custom firmware wifi`, `pwnterrey marauder` | WiGLE-style CSV (`WigleWifi-…` on line 1, column header on line 2). |
+| `wifi_ble_android` | WiGLE-style CSV from Android apps — header on **line 1** (no metadata line). |
+| `lte_android` | LTE/cell CSV from Android scanner apps — English headers, no metadata line. |
 | Flipper / Marauder / Kiisu / Kismet / Wardriver UK values | **Wardrive log** files (line-oriented exports), **not** WiGLE CSV spreadsheets. |
 
 ## Flipper Zero / Marauder ESP32 logs
