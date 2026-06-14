@@ -36,7 +36,7 @@ else
     # application_close_timeout=10s triggers "took too long to shut down" warnings.
     # Align handshake with nginx/frontend (1.5 h). Allow 10 min for cleanup after disconnect.
     exec daphne -b 0.0.0.0 -p 8000 \
-        --websocket-connect-timeout 5400 \
+        --websocket_connect_timeout 5400 \
         --application-close-timeout 600 \
         wardrive.asgi:application
 fi
