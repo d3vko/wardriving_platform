@@ -1,3 +1,12 @@
+class LteCellType:
+    SERVING = "serving"
+    NEIGHBOR = "neighbor"
+    CHOICES = [
+        (SERVING, "Serving"),
+        (NEIGHBOR, "Neighbor"),
+    ]
+
+
 class SourceDevice:
     UNKNOWN = "unknown"
     MININO = "minino"

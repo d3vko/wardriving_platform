@@ -6,6 +6,7 @@ from django.utils.timezone import now
 from decimal import Decimal, InvalidOperation
 
 from apps.core.models import WardriveBaseModel, SourceDevice
+from apps.wardriving import LteCellType
 
 
 class Wardriving(WardriveBaseModel):
@@ -89,7 +90,49 @@ class LTEWardriving(WardriveBaseModel):
     mnc = models.IntegerField(verbose_name="MNC (Mobile Network Code)")
     lac = models.IntegerField(verbose_name="LAC (Location Area Code)")
     cell_id = models.IntegerField(verbose_name="Cell ID (Cell Global Identity)")
+    cell_type = models.CharField(
+        max_length=8,
+        choices=LteCellType.CHOICES,
+        default=LteCellType.SERVING,
+        verbose_name="Cell Type",
+    )
+    state = models.SmallIntegerField(
+        default=0,
+        verbose_name="Registration State",
+        help_text="1=home, 5=roaming, 0/2/3=not registered.",
+    )
+    enodeb_id = models.BigIntegerField(
+        default=0,
+        verbose_name="eNodeB ID",
+        help_text="cell_id // 256",
+    )
+    sector_id = models.SmallIntegerField(
+        default=0,
+        verbose_name="Sector ID",
+        help_text="cell_id % 256",
+    )
+    pci = models.SmallIntegerField(
+        default=0,
+        verbose_name="PCI (Physical Cell ID)",
+    )
     band = models.TextField(verbose_name="Band")
+    earfcn = models.IntegerField(
+        default=0,
+        verbose_name="EARFCN",
+        help_text="E-UTRA Absolute Radio Frequency Channel Number.",
+    )
+    dl_freq_mhz = models.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        default=0,
+        verbose_name="DL Frequency (MHz)",
+    )
+    ul_freq_mhz = models.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        default=0,
+        verbose_name="UL Frequency (MHz)",
+    )
     rssi = models.IntegerField(verbose_name="RSSI (Signal Strength)")
     rsrp = models.IntegerField(verbose_name="RSRP (Reference Signal Received Power)")
     rsrq = models.IntegerField(verbose_name="RSRQ (Reference Signal Received Quality)")
@@ -98,10 +141,10 @@ class LTEWardriving(WardriveBaseModel):
     )
     provider = models.TextField(verbose_name="Provider", default="")
     current_latitude = models.DecimalField(
-        max_digits=9, decimal_places=6, verbose_name="Latitude", default=0
+        max_digits=13, decimal_places=7, verbose_name="Latitude", default=0
     )
     current_longitude = models.DecimalField(
-        max_digits=9, decimal_places=6, verbose_name="Longitude", default=0
+        max_digits=13, decimal_places=7, verbose_name="Longitude", default=0
     )
     tech = models.TextField(verbose_name="Technology", default="LTE")
 
@@ -115,6 +158,10 @@ class LTEWardriving(WardriveBaseModel):
                 name="lte_map_user_fs",
                 condition=Q(deleted_at__isnull=True),
             ),
+            models.Index(fields=["cell_type"], name="lte_cell_type_idx"),
+            models.Index(fields=["pci"], name="lte_pci_idx"),
+            models.Index(fields=["earfcn"], name="lte_earfcn_idx"),
+            models.Index(fields=["enodeb_id"], name="lte_enodeb_idx"),
         ]
 
     def __str__(self):

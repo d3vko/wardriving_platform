@@ -12,6 +12,22 @@ from datetime import datetime
 
 from apps.files.utils import bulk_upsert_by_keys, wardriving_better_obj_fn
 from apps.wardriving.models import LTEWardriving, Wardriving, SourceDevice
+from apps.wardriving import LteCellType
+
+
+def _to_int(val, default: int = 0) -> int:
+    """Convert a value to int, returning default if None, NaN, or unparseable."""
+    if val is None:
+        return default
+    try:
+        if isna(val):
+            return default
+    except (TypeError, ValueError):
+        pass
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
 
 
 def process_lte_wardriving(
@@ -22,11 +38,22 @@ def process_lte_wardriving(
     """
     Process LTE wardriving CSV from Lilygo T-SIM7000G or Android scanner apps.
 
-    Accepts both Spanish (RF firmware) and English (Android) column names:
-      Spanish: Timestamp, Tecnología, Estado, MCC, MNC, LAC, CellID, Banda,
-               RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud
-      English: Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band,
-               RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude
+    Accepts Spanish (RF firmware legacy), English (Android), and the extended
+    serial/firmware schema.
+
+    Legacy Spanish (15 cols):
+      Timestamp, Tecnología, Estado, MCC, MNC, LAC, CellID, Banda,
+      RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud
+
+    Legacy English (Android, 15 cols):
+      Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band,
+      RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude
+
+    Extended (new firmware / serial export, 23 cols):
+      Source (optional), Timestamp, Tecnología, TipoCelda, Estado,
+      MCC, MNC, LAC, CellID, eNodeB, Sector, PCI, Banda, EARFCN,
+      FreqDL_MHz, FreqUL_MHz, RSSI, RSRP, RSRQ, SINR, Operador,
+      Longitud, Latitud
 
     Placeholder / unserved-cell rows are filtered out before upsert:
       - CellID == 268435455  (0x0FFFFFFF sentinel for "no cell")
@@ -38,28 +65,47 @@ def process_lte_wardriving(
     if dataframe.empty:
         return 0, 0, 0
 
-    # Drop columns that carry no model-relevant data (both languages)
-    pop_keys = ["Timestamp", "Estado", "State"]
+    # Drop the serial stream Source prefix if present (WebSerial/SD export).
+    if "Source" in dataframe.columns:
+        dataframe.drop(columns=["Source"], inplace=True)
+
+    # Extract Timestamp before rename so we can derive first_seen.
+    timestamp_col = None
+    for _ts_name in ("Timestamp",):
+        if _ts_name in dataframe.columns:
+            timestamp_col = to_datetime(dataframe.pop(_ts_name), errors="coerce")
+            break
+
     renamed_keys = {
-        # Spanish → canonical
+        # Spanish → canonical (legacy + extended)
         "Tecnología": "tech",
         "CellID": "cell_id",
         "Banda": "band",
         "Operador": "provider",
         "Longitud": "current_longitude",
         "Latitud": "current_latitude",
-        # English → canonical (Android)
+        "TipoCelda": "cell_type",
+        "Estado": "state",
+        "eNodeB": "enodeb_id",
+        "Sector": "sector_id",
+        "PCI": "pci",
+        "EARFCN": "earfcn",
+        "FreqDL_MHz": "dl_freq_mhz",
+        "FreqDL": "dl_freq_mhz",
+        "FreqUL_MHz": "ul_freq_mhz",
+        "FreqUL": "ul_freq_mhz",
+        # English → canonical (Android / extended EN)
         "Technology": "tech",
         "Band": "band",
         "Operator": "provider",
         "Longitude": "current_longitude",
         "Latitude": "current_latitude",
+        "CellType": "cell_type",
+        "State": "state",
+        "EnodeB": "enodeb_id",
     }
     downcase_keys = ["MCC", "MNC", "LAC", "RSSI", "RSRP", "RSRQ", "SINR"]
 
-    for key in pop_keys:
-        if key in dataframe.columns:
-            dataframe.pop(key)
     dataframe.rename(columns=renamed_keys, inplace=True)
     for key in downcase_keys:
         if key in dataframe.columns:
@@ -75,9 +121,29 @@ def process_lte_wardriving(
 
     # Coerce key identifier columns to numeric so sentinel comparisons work
     # regardless of whether the CSV was read as str or int.
-    for _col in ("cell_id", "lac", "mcc"):
+    for _col in ("cell_id", "lac", "mcc", "state", "enodeb_id", "sector_id",
+                 "pci", "earfcn"):
         if _col in dataframe.columns:
             dataframe[_col] = to_numeric(dataframe[_col], errors="coerce")
+
+    for _col in ("dl_freq_mhz", "ul_freq_mhz"):
+        if _col in dataframe.columns:
+            dataframe[_col] = to_numeric(dataframe[_col], errors="coerce")
+
+    # Normalise cell_type: accept serving/neighbor case-insensitive; default serving.
+    _valid_cell_types = {LteCellType.SERVING, LteCellType.NEIGHBOR}
+    if "cell_type" in dataframe.columns:
+        dataframe["cell_type"] = (
+            dataframe["cell_type"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .where(dataframe["cell_type"].astype(str).str.strip().str.lower()
+                   .isin(_valid_cell_types),
+                   other=LteCellType.SERVING)
+        )
+    else:
+        dataframe["cell_type"] = LteCellType.SERVING
 
     # Filter placeholder / unserved-cell rows:
     #   CellID 268435455 (0x0FFFFFFF) — no cell locked
@@ -99,10 +165,41 @@ def process_lte_wardriving(
     if dataframe.empty:
         return 0, 0, 0
 
+    # Re-align timestamp_col index after all filtering.
+    if timestamp_col is not None:
+        timestamp_col = timestamp_col.reindex(dataframe.index)
+
     rows = []
-    for instance_data in dataframe.to_dict(orient="records"):
-        if not instance_data.get("cell_id"):
+    for idx, instance_data in enumerate(dataframe.to_dict(orient="records")):
+        cell_id_val = instance_data.get("cell_id")
+        # Neighbor rows may legitimately have cell_id == 0 — skip only if truly absent.
+        if cell_id_val is None or (not isinstance(cell_id_val, (int, float)) and
+                                   not str(cell_id_val).strip()):
             continue
+
+        # Resolve first_seen from Timestamp column when available.
+        fs = None
+        if timestamp_col is not None:
+            raw_ts = timestamp_col.iloc[idx] if idx < len(timestamp_col) else None
+            if raw_ts is not None and not isna(raw_ts):
+                fs = raw_ts
+                if hasattr(fs, "to_pydatetime"):
+                    fs = fs.to_pydatetime()
+                if isinstance(fs, datetime) and is_naive(fs):
+                    fs = make_aware(fs)
+        if fs is None:
+            fs = now()
+
+        cell_id_int = int(cell_id_val) if not isna(cell_id_val) else 0
+
+        # Derive eNodeB / sector from cell_id when not supplied by firmware.
+        enodeb = instance_data.get("enodeb_id")
+        sector = instance_data.get("sector_id")
+        if (enodeb is None or isna(enodeb)) and cell_id_int > 0:
+            enodeb = cell_id_int // 256
+        if (sector is None or isna(sector)) and cell_id_int > 0:
+            sector = cell_id_int % 256
+
         row = {
             "uploaded_by": uploaded_by,
             "device_source": device_source,
@@ -110,8 +207,16 @@ def process_lte_wardriving(
             "mcc": instance_data.get("mcc"),
             "mnc": instance_data.get("mnc"),
             "lac": instance_data.get("lac"),
-            "cell_id": instance_data.get("cell_id"),
-            "first_seen": now(),
+            "cell_id": cell_id_val,
+            "cell_type": instance_data.get("cell_type", LteCellType.SERVING),
+            "state": _to_int(instance_data.get("state")),
+            "enodeb_id": int(enodeb) if enodeb is not None and not isna(enodeb) else 0,
+            "sector_id": int(sector) if sector is not None and not isna(sector) else 0,
+            "pci": _to_int(instance_data.get("pci")),
+            "earfcn": _to_int(instance_data.get("earfcn")),
+            "dl_freq_mhz": instance_data.get("dl_freq_mhz") or 0,
+            "ul_freq_mhz": instance_data.get("ul_freq_mhz") or 0,
+            "first_seen": fs,
             "rssi": instance_data.get("rssi"),
             "rsrp": instance_data.get("rsrp"),
             "rsrq": instance_data.get("rsrq"),
@@ -134,11 +239,21 @@ def process_lte_wardriving(
             "mnc",
             "lac",
             "cell_id",
+            "cell_type",
+            "pci",
         ],
         rows=rows,
         better_obj_fn=wardriving_better_obj_fn,
         update_fields=[
             "first_seen",
+            "state",
+            "enodeb_id",
+            "sector_id",
+            "pci",
+            "earfcn",
+            "dl_freq_mhz",
+            "ul_freq_mhz",
+            "cell_type",
             "rssi",
             "rsrp",
             "rsrq",
@@ -157,6 +272,8 @@ def process_lte_wardriving(
             "mnc",
             "lac",
             "cell_id",
+            "cell_type",
+            "pci",
             "rssi",
         ],
         chunk_size=1000,
