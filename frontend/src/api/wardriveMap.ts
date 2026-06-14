@@ -167,6 +167,7 @@ function downloadKmlViaWs(
           return
         }
         if (msg.id !== id) return
+        if (msg.type === 'kml_pending') return
         if (!msg.ok) {
           finish(() => {
             ws.close()

@@ -2,7 +2,7 @@
 
 from urllib.parse import parse_qs
 
-from channels.db import database_sync_to_async
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -11,7 +11,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 User = get_user_model()
 
 
-@database_sync_to_async
+@sync_to_async(thread_sensitive=False)
 def _user_from_token(token_key: str):
     try:
         access = AccessToken(token_key)

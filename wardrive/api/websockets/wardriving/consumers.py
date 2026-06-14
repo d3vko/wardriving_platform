@@ -199,6 +199,11 @@ class WifiKmlConsumer(_AuthWsConsumer):
             return
         msg_id = data.get("id")
         params = _query_params_from_message(data)
+        await self.send(
+            text_data=json.dumps(
+                {"id": msg_id, "ok": True, "type": "kml_pending"},
+            )
+        )
         status, body = await _wifi_kml(self.scope["user"], params)
         if status == 200:
             content, filename = body
@@ -245,6 +250,11 @@ class LteKmlConsumer(_AuthWsConsumer):
             return
         msg_id = data.get("id")
         params = _query_params_from_message(data)
+        await self.send(
+            text_data=json.dumps(
+                {"id": msg_id, "ok": True, "type": "kml_pending"},
+            )
+        )
         status, body = await _lte_kml(self.scope["user"], params)
         if status == 200:
             content, filename = body

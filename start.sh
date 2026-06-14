@@ -31,12 +31,16 @@ else
     echo "Starting Daphne (ASGI: HTTP + WebSocket)"
     python /code/wardrive/manage.py collectstatic --noinput
     export PYTHONPATH=/code/wardrive
-    # KML export can take a long time on large date ranges. Defaults are too low:
-    # websocket_connect_timeout=5s kills the handshake while the server is busy;
-    # application_close_timeout=10s triggers "took too long to shut down" warnings.
-    # Align handshake with nginx/frontend (1.5 h). Allow 10 min for cleanup after disconnect.
+    # KML export can take a long time on large date ranges. Daphne defaults are too low:
+    #   websocket_connect_timeout=5s  → handshake killed while server is busy
+    #   ping_timeout=30s              → idle WS closed during silent KML generation
+    #   application_close_timeout=10s → "took too long to shut down" warnings
+    # Align all WS timeouts with nginx/frontend (1.5 h).
     exec daphne -b 0.0.0.0 -p 8000 \
         --websocket_connect_timeout 5400 \
-        --application-close-timeout 600 \
+        --websocket_timeout 5400 \
+        --ping-interval 120 \
+        --ping-timeout 5400 \
+        --application-close-timeout 5400 \
         wardrive.asgi:application
 fi
