@@ -3,7 +3,6 @@ import {
   AppBar,
   Avatar,
   Box,
-  CssBaseline,
   Divider,
   Drawer,
   IconButton,
@@ -33,6 +32,7 @@ import {
 } from '@mui/icons-material'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { useThemeMode } from '@/context/ThemeModeContext'
 
 const DRAWER_WIDTH = 240
 const MINI_DRAWER_WIDTH = 64
@@ -56,11 +56,6 @@ const navItems: NavItem[] = [
   { label: 'KML downloads', path: '/downloads', icon: <DownloadIcon /> },
 ]
 
-interface LayoutProps {
-  onToggleTheme: () => void
-  isDarkMode: boolean
-}
-
 function getInitialDrawerOpen(): boolean {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
@@ -70,7 +65,7 @@ function getInitialDrawerOpen(): boolean {
   }
 }
 
-export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
+export default function Layout() {
   const theme = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -78,6 +73,7 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(getInitialDrawerOpen)
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, logout } = useAuth()
+  const { isDarkMode, toggleTheme: onToggleTheme } = useThemeMode()
 
   const handleDrawerToggle = () => {
     if (isMobile) {
@@ -241,7 +237,6 @@ export default function Layout({ onToggleTheme, isDarkMode }: LayoutProps) {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <CssBaseline />
 
       {/* AppBar */}
       <AppBar

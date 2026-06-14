@@ -1,8 +1,11 @@
+import hashlib
+
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 
 from django_filters import rest_framework as filters
 
+from django.core.cache import cache
 from django.db.models import Q
 
 from rest_framework import mixins, permissions, status, viewsets
@@ -75,6 +78,16 @@ def _exclude_default_coords():
     return ~Q(current_latitude=0, current_longitude=0)
 
 
+def _map_cache_key(prefix: str, user_pk, query_params) -> str:
+    """Build a deterministic cache key scoped to a user and their query params."""
+    sorted_qs = "&".join(
+        f"{k}={v}"
+        for k, v in sorted(query_params.items())
+    )
+    digest = hashlib.sha1(sorted_qs.encode()).hexdigest()[:16]
+    return f"{prefix}:{user_pk}:{digest}"
+
+
 class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     WiFi points with real coordinates from the SQL view `wardriving_vendor`
@@ -94,7 +107,13 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+        key = _map_cache_key("wifi_list", request.user.pk, request.query_params)
+        cached = cache.get(key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(key, response.data)
+        return response
 
     @swagger_auto_schema(
         manual_parameters=list_params,
@@ -161,7 +180,13 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
         """Paginated list with optional filters."""
-        return super().list(request, *args, **kwargs)
+        key = _map_cache_key("lte_list", request.user.pk, request.query_params)
+        cached = cache.get(key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(key, response.data)
+        return response
 
     @swagger_auto_schema(
         manual_parameters=list_params,

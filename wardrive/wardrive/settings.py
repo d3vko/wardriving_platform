@@ -357,6 +357,23 @@ def _redis_url_with_db(url: str, db: int, username: str = None) -> str:
     return urlunparse(parsed._replace(netloc=netloc, path=new_path))
 
 
+# Cache — db 4 (0=broker, 1=result, 3=channels). Falls back to in-memory when Redis is absent.
+if REDIS_URL.strip():
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _redis_url_with_db(REDIS_URL, 4),
+            "TIMEOUT": 60,
+            "KEY_PREFIX": "wardrive_map",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
+
 # Celery: use REDIS_URL with db 0/1 when broker/result URLs are not set (e.g. Railway single REDIS_URL)
 _default_broker = _redis_url_with_db(REDIS_URL, 0) or "redis://localhost:6379/0"
 _default_result = _redis_url_with_db(REDIS_URL, 1) or "redis://localhost:6379/1"

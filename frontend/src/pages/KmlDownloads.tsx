@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Alert,
   Box,
@@ -6,10 +6,18 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  LinearProgress,
   Stack,
   Typography,
 } from '@mui/material'
 import DownloadIcon from '@mui/icons-material/Download'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import { useBlocker } from 'react-router-dom'
 
 import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import { ApiError } from '@/api/client'
@@ -22,11 +30,41 @@ import dayjs, { type Dayjs } from 'dayjs'
 
 type DownloadKind = 'wifi' | 'lte' | null
 
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 export default function KmlDownloads() {
   const [loading, setLoading] = useState<DownloadKind>(null)
   const [error, setError] = useState<string | null>(null)
   const [afterDate, setAfterDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.startDate))
   const [beforeDate, setBeforeDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.endDate))
+  const [elapsed, setElapsed] = useState(0)
+
+  // Timer: increments every second while a download is in progress.
+  useEffect(() => {
+    if (loading === null) {
+      setElapsed(0)
+      return
+    }
+    const id = window.setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [loading])
+
+  // Warn the browser (close/reload tab) while downloading.
+  useEffect(() => {
+    if (loading === null) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [loading])
+
+  // Block in-app navigation (drawer, back button) while downloading.
+  const blocker = useBlocker(loading !== null)
 
   const handleDownload = async (kind: Exclude<DownloadKind, null>) => {
     setError(null)
@@ -71,9 +109,9 @@ export default function KmlDownloads() {
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         Download your scans by technology. Files include only data for the current session user.
-        The API requires a date range (`first_seen_after` and `first_seen_before`) and normalizes
-        each bound to the full calendar day in the value&apos;s timezone. Very wide ranges may take
-        longer to generate.
+        The API requires a date range (<code>first_seen_after</code> and{' '}
+        <code>first_seen_before</code>) and normalizes each bound to the full calendar day in the
+        value&apos;s timezone. Very wide ranges may take longer to generate.
       </Typography>
 
       <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -176,6 +214,86 @@ export default function KmlDownloads() {
           </CardContent>
         </Card>
       </Stack>
+
+      {/* Full-screen overlay while downloading */}
+      {loading !== null && (
+        <Box
+          role="status"
+          aria-live="polite"
+          aria-label="Descargando archivo KML"
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1400,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 3,
+            px: 4,
+            bgcolor: 'rgba(0, 0, 0, 0.72)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <CircularProgress size={72} thickness={3} sx={{ color: 'primary.light' }} />
+
+          <Stack spacing={1} alignItems="center" sx={{ maxWidth: 420, textAlign: 'center' }}>
+            <Typography variant="h5" fontWeight={700} sx={{ color: '#fff' }}>
+              Generando archivo KML ({loading.toUpperCase()})…
+            </Typography>
+
+            <Typography variant="h6" sx={{ color: 'primary.light', fontVariantNumeric: 'tabular-nums' }}>
+              {formatElapsed(elapsed)}
+            </Typography>
+
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.75)' }}>
+              El servidor está procesando y empaquetando tus datos. La descarga comenzará
+              automáticamente al terminar.
+            </Typography>
+
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+              <WarningAmberIcon sx={{ color: 'warning.light', fontSize: 20 }} />
+              <Typography variant="body2" fontWeight={600} sx={{ color: 'warning.light' }}>
+                No cierres esta pestaña ni navegues a otra sección.
+              </Typography>
+            </Stack>
+          </Stack>
+
+          <Box sx={{ width: '100%', maxWidth: 420 }}>
+            <LinearProgress color="primary" />
+          </Box>
+        </Box>
+      )}
+
+      {/* Confirmation dialog when the user tries to navigate away via the SPA router */}
+      <Dialog
+        open={blocker.state === 'blocked'}
+        onClose={() => blocker.reset?.()}
+        aria-labelledby="nav-block-title"
+      >
+        <DialogTitle id="nav-block-title" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningAmberIcon color="warning" />
+          Descarga en curso
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Hay una descarga KML en progreso. Si navegas ahora la descarga se cancelará y no
+            recibirás el archivo. ¿Deseas continuar de todas formas?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => blocker.reset?.()} variant="contained" autoFocus>
+            Continuar esperando
+          </Button>
+          <Button
+            onClick={() => blocker.proceed?.()}
+            color="error"
+            variant="outlined"
+          >
+            Cancelar descarga y salir
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

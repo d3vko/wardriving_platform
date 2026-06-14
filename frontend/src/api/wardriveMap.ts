@@ -111,6 +111,8 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
+const KML_DOWNLOAD_TIMEOUT_MS = 90 * 60 * 1000 // 1.5 hours
+
 function downloadKmlViaWs(
   kind: 'wifi' | 'lte',
   params: KmlDownloadParams,
@@ -134,7 +136,7 @@ function downloadKmlViaWs(
       settled = true
       ws.close()
       reject(new Error('KML download timed out.'))
-    }, 300_000)
+    }, KML_DOWNLOAD_TIMEOUT_MS)
 
     const finish = (fn: () => void) => {
       if (settled) return
