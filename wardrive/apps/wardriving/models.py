@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Q
+from django.db.models.functions import Upper, Substr
 from django.utils.timezone import now
 
 from decimal import Decimal, InvalidOperation
@@ -33,6 +34,11 @@ class Wardriving(WardriveBaseModel):
         max_digits=6, decimal_places=2, verbose_name="Accuracy (Meters)", default=0
     )
     type = models.CharField(max_length=50, verbose_name="Type", default="WIFI")
+    mac_oui = models.GeneratedField(
+        expression=Upper(Substr("mac", 1, 8)),
+        output_field=models.CharField(max_length=8),
+        db_persist=True,
+    )
 
     class Meta:
         db_table = "wardriving"
@@ -43,6 +49,15 @@ class Wardriving(WardriveBaseModel):
                 fields=["uploaded_by", "mac", "channel"],
                 name="wardriving_up_mac_ch_alv",
                 condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["uploaded_by", "-first_seen"],
+                name="wardriving_map_user_fs",
+                condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["mac_oui"],
+                name="wardriving_mac_oui_idx",
             ),
         ]
 
@@ -94,6 +109,13 @@ class LTEWardriving(WardriveBaseModel):
         db_table = "lte_wardriving"
         verbose_name = "LTE Wardriving Found"
         verbose_name_plural = "LTE Wardriving Founds"
+        indexes = [
+            models.Index(
+                fields=["uploaded_by", "-first_seen"],
+                name="lte_map_user_fs",
+                condition=Q(deleted_at__isnull=True),
+            ),
+        ]
 
     def __str__(self):
         return f"`{self.pk}`:{self.mcc}-{self.mnc}-{self.lac} : ({self.cell_id})"

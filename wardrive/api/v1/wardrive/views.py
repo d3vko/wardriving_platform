@@ -86,7 +86,11 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     pagination_class = MapPlacesPagination
     filter_backends = [filters.DjangoFilterBackend]
     filterset_class = WifiWardrivingFilterSet
-    queryset = WardrivingVendorView.objects.order_by("-first_seen")
+
+    def get_queryset(self):
+        return WardrivingVendorView.objects.filter(
+            uploaded_by=self.request.user.username
+        ).order_by("-first_seen")
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
@@ -110,9 +114,7 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        queryset = self.filter_queryset(
-            self.get_queryset().filter(uploaded_by=request.user.username)
-        ).order_by("-first_seen")
+        queryset = self.filter_queryset(self.get_queryset()).order_by("-first_seen")
         if not queryset.exists():
             return Response(
                 {
@@ -151,9 +153,10 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     filterset_class = LteWardrivingFilterSet
 
     def get_queryset(self):
-        return LTEWardriving.objects.filter(_exclude_default_coords()).order_by(
-            "-first_seen"
-        )
+        return LTEWardriving.objects.filter(
+            _exclude_default_coords(),
+            uploaded_by=self.request.user.username,
+        ).order_by("-first_seen")
 
     @swagger_auto_schema(manual_parameters=list_params)
     def list(self, request, *args, **kwargs):
@@ -178,9 +181,7 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        queryset = self.filter_queryset(
-            self.get_queryset().filter(uploaded_by=request.user.username)
-        ).order_by("-first_seen")
+        queryset = self.filter_queryset(self.get_queryset()).order_by("-first_seen")
         if not queryset.exists():
             return Response(
                 {

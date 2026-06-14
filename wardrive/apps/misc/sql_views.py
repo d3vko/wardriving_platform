@@ -26,10 +26,10 @@ class WardrivingVendorsSQL:
             wardriving.altitude_meters,
             wardriving.accuracy_meters
         FROM wardriving
-        LEFT JOIN vendor ON UPPER(REGEXP_REPLACE(vendor.normalized_prefix,'(.{2})(.{2})(.{2})', '\1:\2:\3'))=UPPER(SUBSTRING(wardriving.mac,1,8))
+        LEFT JOIN vendor ON vendor.prefix_oui = wardriving.mac_oui
         WHERE
             (wardriving.current_latitude!=0 AND wardriving.current_longitude!=0)
-	        AND wardriving.deleted_at is NULL
+            AND wardriving.deleted_at is NULL
         """,
         # 🚧 TODO: All other db systems
         "django.db.backends.sqlite3": "SELECT 1 AS id WHERE 1=0",

@@ -1,5 +1,6 @@
 import {
   ApiError,
+  apiFetch,
   getTokens,
   refreshAccessTokenOrThrow,
 } from '@/api/client'
@@ -27,7 +28,7 @@ export type PaginatedPlaces = {
 export type PlacesListParams = {
   page?: number
   page_size?: number
-  /** Case-insensitive substring match on uploaded_by */
+  /** Exact match on uploaded_by (scoped server-side to the authenticated user) */
   uploaded_by?: string
   /** ISO 8601: first_seen >= (normalized server-side) */
   first_seen_after?: string
@@ -60,10 +61,6 @@ function randomId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function wardriveListWsPath(resource: 'wifi' | 'lte'): string {
-  return `/wardriving/v1/wardrive/${resource}/`
-}
-
 function wardriveKmlWsPath(kind: 'wifi' | 'lte'): string {
   return `/wardriving/v1/wardrive/${kind}/kml/`
 }
@@ -73,14 +70,15 @@ function buildWsUrl(path: string, token: string): string {
   return `${wsScheme()}//${window.location.host}${path}?${q.toString()}`
 }
 
-function listPayloadFromParams(params: PlacesListParams, id: string): Record<string, unknown> {
-  const out: Record<string, unknown> = { id }
-  if (params.page != null) out.page = params.page
-  if (params.page_size != null) out.page_size = params.page_size
-  if (params.uploaded_by) out.uploaded_by = params.uploaded_by
-  if (params.first_seen_after) out.first_seen_after = params.first_seen_after
-  if (params.first_seen_before) out.first_seen_before = params.first_seen_before
-  return out
+function listQueryFromParams(params: PlacesListParams): string {
+  const q = new URLSearchParams()
+  if (params.page != null) q.set('page', String(params.page))
+  if (params.page_size != null) q.set('page_size', String(params.page_size))
+  if (params.uploaded_by) q.set('uploaded_by', params.uploaded_by)
+  if (params.first_seen_after) q.set('first_seen_after', params.first_seen_after)
+  if (params.first_seen_before) q.set('first_seen_before', params.first_seen_before)
+  const qs = q.toString()
+  return qs ? `?${qs}` : ''
 }
 
 async function getAccessTokenForWs(): Promise<string> {
@@ -89,109 +87,12 @@ async function getAccessTokenForWs(): Promise<string> {
   return refreshAccessTokenOrThrow()
 }
 
-function fetchPlacesViaWs(
-  resource: 'wifi' | 'lte',
-  params: PlacesListParams,
-  accessToken: string,
-): Promise<PaginatedPlaces> {
-  return new Promise((resolve, reject) => {
-    const path = wardriveListWsPath(resource)
-    const ws = new WebSocket(buildWsUrl(path, accessToken))
-    const id = randomId()
-    const payload = listPayloadFromParams(params, id)
-    const timeoutMs = 90_000
-    let settled = false
-    let retried401 = false
-
-    const timer = window.setTimeout(() => {
-      if (settled) return
-      settled = true
-      ws.close()
-      reject(new Error('Wardriving map request timed out.'))
-    }, timeoutMs)
-
-    const finish = (fn: () => void) => {
-      if (settled) return
-      settled = true
-      window.clearTimeout(timer)
-      fn()
-    }
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify(payload))
-    }
-
-    ws.onmessage = (ev) => {
-      if (typeof ev.data !== 'string') return
-      let msg: {
-        id?: string
-        ok?: boolean
-        data?: PaginatedPlaces
-        status?: number
-        detail?: unknown
-      }
-      try {
-        msg = JSON.parse(ev.data) as typeof msg
-      } catch {
-        finish(() => reject(new Error('Invalid WebSocket response')))
-        ws.close()
-        return
-      }
-      if (msg.id !== id) return
-      finish(() => {
-        ws.close()
-        if (msg.ok && msg.data) {
-          resolve(msg.data)
-        } else {
-          reject(
-            new ApiError(
-              msg.status ?? 500,
-              String(msg.detail ?? 'Request failed'),
-              msg,
-            ),
-          )
-        }
-      })
-    }
-
-    ws.onerror = () => {
-      finish(() => reject(new Error('WebSocket connection error')))
-    }
-
-    ws.onclose = (ev) => {
-      if (settled) return
-      if (ev.code === 4001 && !retried401) {
-        retried401 = true
-        void refreshAccessTokenOrThrow()
-          .then((newToken) =>
-            fetchPlacesViaWs(resource, params, newToken).then(resolve, reject),
-          )
-          .catch(reject)
-        return
-      }
-      finish(() =>
-        reject(
-          new Error(
-            ev.reason || `WebSocket closed (${ev.code})`,
-          ),
-        ),
-      )
-    }
-  })
+export function fetchWifiPlaces(params: PlacesListParams): Promise<PaginatedPlaces> {
+  return apiFetch<PaginatedPlaces>(`/wardrive/wifi/${listQueryFromParams(params)}`)
 }
 
-export async function fetchWifiPlaces(
-  params: PlacesListParams,
-): Promise<PaginatedPlaces> {
-  const token = await getAccessTokenForWs()
-  return fetchPlacesViaWs('wifi', params, token)
-}
-
-export async function fetchLtePlaces(
-  params: PlacesListParams,
-): Promise<PaginatedPlaces> {
-  const token = await getAccessTokenForWs()
-  return fetchPlacesViaWs('lte', params, token)
+export function fetchLtePlaces(params: PlacesListParams): Promise<PaginatedPlaces> {
+  return apiFetch<PaginatedPlaces>(`/wardrive/lte/${listQueryFromParams(params)}`)
 }
 
 export type KmlDownloadParams = {

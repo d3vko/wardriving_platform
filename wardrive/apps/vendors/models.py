@@ -1,10 +1,17 @@
 from django.db import models
+from django.db.models import Value
+from django.db.models.functions import Upper
 from django.utils.timezone import now
 
 from decimal import Decimal, InvalidOperation
 
 from . import SourceVendor
 from apps.core.models import BaseModel
+
+
+class _RegexpReplace(models.Func):
+    """PostgreSQL REGEXP_REPLACE(field, pattern, replacement) wrapper."""
+    function = "REGEXP_REPLACE"
 
 
 class Vendors(BaseModel):
@@ -22,10 +29,24 @@ class Vendors(BaseModel):
     source = models.CharField(max_length=64, choices=SourceVendor.CHOICES)
     source_url = models.URLField(blank=True, default="")
     ingested_at = models.DateTimeField(auto_now_add=True)
+    # OUI prefix formatted as XX:XX:XX for fast JOIN with wardriving.mac_oui
+    prefix_oui = models.GeneratedField(
+        expression=Upper(
+            _RegexpReplace(
+                Upper("normalized_prefix"),
+                Value(r"(.{2})(.{2})(.{2})"),
+                Value(r"\1:\2:\3"),
+                output_field=models.CharField(max_length=8),
+            )
+        ),
+        output_field=models.CharField(max_length=8),
+        db_persist=True,
+    )
 
     class Meta:
         indexes = [
             models.Index(fields=["registry", "prefix_bits", "normalized_prefix"]),
+            models.Index(fields=["prefix_oui"], name="vendor_prefix_oui_idx"),
         ]
         constraints = [
             models.UniqueConstraint(

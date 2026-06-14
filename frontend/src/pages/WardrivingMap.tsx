@@ -30,10 +30,8 @@ import dayjs, { type Dayjs } from 'dayjs'
 
 import 'leaflet/dist/leaflet.css'
 
-/** Puntos visibles por “página” del mapa máx 750 pines. */
+/** Puntos visibles por página del mapa. */
 const VIEW_SIZE = 500
-const BATCH_SIZE = 250
-const BATCHES_PER_VIEW = VIEW_SIZE / BATCH_SIZE
 
 const DEFAULT_CENTER: [number, number] = [40.4168, -3.7038]
 const DEFAULT_ZOOM = 6
@@ -166,56 +164,19 @@ export default function WardrivingMap() {
     async function load() {
       setLoading(true)
       setError(null)
-      const baseSubPage = (page - 1) * BATCHES_PER_VIEW + 1
       const params = {
+        page,
+        page_size: VIEW_SIZE,
         first_seen_after,
         first_seen_before,
         ...(user?.username ? { uploaded_by: user.username } : {}),
       }
       try {
-        /** Listas WiFi/LTE vía WebSocket (`wardriveMap.ts`). */
         const fetchPlacesForMode = mode === 'wifi' ? fetchWifiPlaces : fetchLtePlaces
-
-        // First batch only — get total count, then request extra pages only if they exist.
-        // (DRF returns 404 for page > last page; parallel requests to empty pages break the UI.)
-        const first = await fetchPlacesForMode({
-          page: baseSubPage,
-          page_size: BATCH_SIZE,
-          ...params,
-        })
+        const result = await fetchPlacesForMode(params)
         if (cancelled) return
-
-        const totalCount = first.count
-        const startOffset = (baseSubPage - 1) * BATCH_SIZE
-        const itemsAvailable = Math.max(0, totalCount - startOffset)
-        const itemsToFetch = Math.min(VIEW_SIZE, itemsAvailable)
-        const numBatches =
-          itemsToFetch === 0
-            ? 0
-            : Math.min(
-                BATCHES_PER_VIEW,
-                Math.ceil(itemsToFetch / BATCH_SIZE),
-              )
-
-        if (numBatches <= 1) {
-          setData(first.results)
-          setTotal(totalCount)
-          return
-        }
-
-        const rest = await Promise.all(
-          Array.from({ length: numBatches - 1 }, (_, i) =>
-            fetchPlacesForMode({
-              page: baseSubPage + 1 + i,
-              page_size: BATCH_SIZE,
-              ...params,
-            }),
-          ),
-        )
-        if (cancelled) return
-        const merged = [first, ...rest].flatMap((r) => r.results)
-        setData(merged)
-        setTotal(totalCount)
+        setData(result.results)
+        setTotal(result.count)
       } catch (e: unknown) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : 'Failed to load data'
@@ -248,14 +209,14 @@ export default function WardrivingMap() {
           <Typography variant="h5" fontWeight={700}>
             Wardriving map
           </Typography>
-          <Chip label="WiFi / LTE · WebSocket" size="small" variant="outlined" color="secondary" />
+          <Chip label="WiFi / LTE · REST" size="small" variant="outlined" color="secondary" />
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Map data (WiFi and LTE) loads over WebSocket to the same paths as the REST list API. Up to{' '}
-          {VIEW_SIZE} pins per view in batches of {BATCH_SIZE}. Date filters in the URL (
+          Map data (WiFi and LTE) loads via HTTP REST. Up to{' '}
+          {VIEW_SIZE} pins per page. Date filters in the URL (
           <code>first_seen_after</code>, <code>first_seen_before</code>). Legend by signal strength.
           {user?.username ? (
-            <> Showing points matching your username filter (<code>uploaded_by</code>).</>
+            <> Showing your points (<code>uploaded_by</code> scoped to your account).</>
           ) : null}
         </Typography>
       </Box>

@@ -26,7 +26,7 @@ class _FirstSeenDateRangeMixin:
 class WifiWardrivingFilterSet(_FirstSeenDateRangeMixin, filters.FilterSet):
     """Optional filters for the WiFi map list (SQL view ``wardriving_vendor``)."""
 
-    uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
+    uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="exact")
     first_seen_after = filters.DateTimeFilter(
         field_name="first_seen",
         method="filter_first_seen_after",
@@ -44,7 +44,7 @@ class WifiWardrivingFilterSet(_FirstSeenDateRangeMixin, filters.FilterSet):
 class LteWardrivingFilterSet(_FirstSeenDateRangeMixin, filters.FilterSet):
     """Optional filters for LTE (``LTEWardriving`` model)."""
 
-    uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="icontains")
+    uploaded_by = filters.CharFilter(field_name="uploaded_by", lookup_expr="exact")
     first_seen_after = filters.DateTimeFilter(
         field_name="first_seen",
         method="filter_first_seen_after",
