@@ -143,7 +143,7 @@ You may also upload logs following:
 -   **WiGLE WiFi CSV (e.g. v1.4)** — first line is metadata (`WigleWifi-1.4`, often with `appRelease=ESP32Marauder`); the **next** line is the header row (`MAC`, `SSID`, `AuthMode`, `FirstSeen`, `Channel`, `RSSI`, `CurrentLatitude`, `CurrentLongitude`, `AltitudeMeters`, `AccuracyMeters`, `Type`). When uploading, set **`device_source`** to **`minino`** or **`rf custom firmware wifi`** so the CSV is read with `skiprows=1` and the correct column mapping (`apps.process.minino` / `apps.process.rf`). **Do not** use **`marauder esp32`** or other Flipper/Marauder log options for this file type: those run `process_file_marauder_esp32`, which expects **line-based wardrive logs**, not a WiGLE spreadsheet export.
 -   Minino device outputs (same CSV shape as above; also available as **`pwnterrey marauder`** in this project when you want event-specific labeling while reusing the Minino processor).
 -   **Android WiFi/BLE CSV (`wifi_ble_android`)** — exported from Android wardriving apps. The header is on **line 1** (no metadata line), same WiGLE column layout: `MAC, SSID, AuthMode, FirstSeen, Channel, RSSI, CurrentLatitude, CurrentLongitude, AltitudeMeters, AccuracyMeters, Type`. BLE rows without a `Channel` value are **discarded** (not persisted).
--   **Android LTE CSV (`lte_android`)** — exported from Android LTE/cell scanner apps. English headers: `Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band, RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude`. Placeholder/unserved rows (`CellID=555555`, `LAC=555555`, `MCC=0`, or no GPS fix) are automatically filtered out.
+-   **Android LTE CSV (`lte_android`)** — exported from Android LTE/cell scanner apps. Extended 22-column Spanish format: `Timestamp, Tecnología, TipoCelda, Estado, MCC, MNC, LAC, CellID, eNodeB, Sector, PCI, Banda, EARFCN, FreqDL_MHz, FreqUL_MHz, RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud`. The legacy 15-column English format (`Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band, RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude`) is still accepted for backwards compatibility. Placeholder/unserved rows (`CellID=268435455`, `LAC=65535`, `MCC=0`, or no GPS fix) are automatically filtered out.
 
 All WiGLE-style CSV paths above are directly compatible with the processing system.
 
@@ -170,8 +170,9 @@ All WiGLE-style CSV paths above are directly compatible with the processing syst
     BLE rows without a `Channel` are discarded automatically.
 
 -   📡 **Android LTE/cell scanner apps**: `lte_android`
-    CSV export with English headers (`Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band, RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude`).
-    Placeholder rows (`CellID=555555`, `LAC=555555`, `MCC=0`) and rows without GPS coordinates are filtered automatically.
+    Extended 22-column Spanish format: `Timestamp, Tecnología, TipoCelda, Estado, MCC, MNC, LAC, CellID, eNodeB, Sector, PCI, Banda, EARFCN, FreqDL_MHz, FreqUL_MHz, RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud`.
+    The legacy 15-column English format is still accepted for backwards compatibility.
+    Placeholder rows (`CellID=268435455`, `LAC=65535`, `MCC=0`) and rows without GPS coordinates are filtered automatically.
 
 ------------------------------------------------------------------------
 
@@ -288,7 +289,7 @@ Upload logs through DRF:
 | --- | --- |
 | `minino`, `rf custom firmware wifi`, `pwnterrey marauder` | WiGLE-style CSV (`WigleWifi-…` on line 1, column header on line 2). |
 | `wifi_ble_android` | WiGLE-style CSV from Android apps — header on **line 1** (no metadata line). |
-| `lte_android` | LTE/cell CSV from Android scanner apps — English headers, no metadata line. |
+| `lte_android` | LTE/cell CSV from Android scanner apps — extended 22-column Spanish format (legacy 15-column English also accepted), no metadata line. |
 | Flipper / Marauder / Kiisu / Kismet / Wardriver UK values | **Wardrive log** files (line-oriented exports), **not** WiGLE CSV spreadsheets. |
 
 ## Flipper Zero / Marauder ESP32 logs

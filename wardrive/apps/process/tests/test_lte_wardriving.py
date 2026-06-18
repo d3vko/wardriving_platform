@@ -1,5 +1,6 @@
 """
-Unit tests for process_lte_wardriving (apps.process.rf).
+Unit tests for process_lte_wardriving (apps.process.rf) and
+process_file_lte_android (apps.process.android).
 
 Covers:
   - Legacy ES/EN CSV (15 columns, no TipoCelda/eNodeB/PCI/EARFCN)
@@ -8,12 +9,15 @@ Covers:
   - Placeholder rows are filtered (CellID sentinel, LAC sentinel, MCC=0, no GPS)
   - Timestamp column drives first_seen (not now())
   - eNodeB / sector_id derived from cell_id when absent
+  - process_file_lte_android wrapper reads CSV file and delegates correctly
 
 Data policy: all CSV fixtures below use SYNTHETIC data — no real GPS captures,
 no real cell IDs from field sessions.  See .cursor/skills/wardriving-test-data-policy/SKILL.md.
 """
 
 import io
+import os
+import tempfile
 from datetime import datetime, timezone
 from unittest.mock import patch
 
@@ -194,3 +198,89 @@ class KeyFieldsTest(SimpleTestCase):
 
         self.assertIn("cell_type", captured_kwargs["key_fields"])
         self.assertIn("pci", captured_kwargs["key_fields"])
+
+
+class LteAndroidWrapperTests(SimpleTestCase):
+    """
+    Smoke tests for process_file_lte_android.
+
+    Verify that the wrapper reads a CSV file from disk and delegates to
+    process_lte_wardriving with the expected rows, covering both the
+    extended Spanish format and the legacy English format.
+    """
+
+    def _run_wrapper(self, csv_text: str) -> list[dict]:
+        from apps.process.android import process_file_lte_android
+
+        captured = []
+
+        def fake_bulk(*, model, key_fields, rows, **kwargs):
+            captured.extend(rows)
+            return len(rows), 0, 0
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False, encoding="utf-8"
+        ) as fh:
+            fh.write(csv_text)
+            tmp_path = fh.name
+
+        try:
+            with patch(_PATCH_BULK, side_effect=fake_bulk):
+                process_file_lte_android(file_path=tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        return captured
+
+    def test_extended_format_two_rows_persisted(self):
+        rows = self._run_wrapper(EXTENDED_CSV)
+        self.assertEqual(len(rows), 2)
+
+    def test_extended_format_cell_types(self):
+        rows = self._run_wrapper(EXTENDED_CSV)
+        cell_types = {r["cell_type"] for r in rows}
+        self.assertIn(LteCellType.SERVING, cell_types)
+        self.assertIn(LteCellType.NEIGHBOR, cell_types)
+
+    def test_extended_format_rf_fields_populated(self):
+        rows = self._run_wrapper(EXTENDED_CSV)
+        serving = next(r for r in rows if r["cell_type"] == LteCellType.SERVING)
+        self.assertEqual(serving["pci"], 21)
+        self.assertEqual(serving["earfcn"], 2825)
+        self.assertAlmostEqual(float(serving["dl_freq_mhz"]), 2627.5)
+
+    def test_legacy_english_format_accepted(self):
+        rows = self._run_wrapper(LEGACY_EN_CSV)
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["cell_type"], LteCellType.SERVING)
+
+    def test_device_source_propagated(self):
+        from apps.process.android import process_file_lte_android
+        from apps.wardriving.models import SourceDevice
+
+        captured = []
+
+        def fake_bulk(*, model, key_fields, rows, **kwargs):
+            captured.extend(rows)
+            return len(rows), 0, 0
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False, encoding="utf-8"
+        ) as fh:
+            fh.write(EXTENDED_CSV)
+            tmp_path = fh.name
+
+        try:
+            with patch(_PATCH_BULK, side_effect=fake_bulk):
+                process_file_lte_android(
+                    file_path=tmp_path,
+                    device_source=SourceDevice.LTE_ANDROID,
+                    uploaded_by="test_user",
+                )
+        finally:
+            os.unlink(tmp_path)
+
+        for row in captured:
+            self.assertEqual(row["device_source"], SourceDevice.LTE_ANDROID)
+            self.assertEqual(row["uploaded_by"], "test_user")

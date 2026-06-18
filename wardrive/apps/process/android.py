@@ -7,10 +7,24 @@ WiFi/BLE source (wifi_ble_android):
   WiGLE layout. BLE rows with no Channel value are discarded by coerce_row.
 
 LTE source (lte_android):
-  Export from Android LTE/cell scanner apps. Headers are English:
+  Export from Android LTE/cell scanner apps.
+
+  Extended format — 22 columns in Spanish (current default):
+    Timestamp, Tecnología, TipoCelda, Estado, MCC, MNC, LAC, CellID,
+    eNodeB, Sector, PCI, Banda, EARFCN, FreqDL_MHz, FreqUL_MHz,
+    RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud
+
+  Legacy format — 15 columns in English (still accepted for backwards compatibility):
     Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band,
     RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude
-  Delegates to process_lte_wardriving (rf.py) which is now bilingual.
+
+  Placeholder / unserved-cell rows are filtered automatically:
+    - CellID == 268435455  (0x0FFFFFFF sentinel)
+    - LAC    == 65535      (0xFFFF sentinel)
+    - MCC    == 0
+    - Rows with missing or non-numeric GPS coordinates
+
+  Delegates to process_lte_wardriving (rf.py).
 """
 
 from __future__ import annotations
@@ -98,13 +112,17 @@ def process_file_lte_android(
     """
     Process LTE/cell CSV from Android scanner apps.
 
-    Expected English headers:
+    Accepts the extended 22-column Spanish format (current default):
+      Timestamp, Tecnología, TipoCelda, Estado, MCC, MNC, LAC, CellID,
+      eNodeB, Sector, PCI, Banda, EARFCN, FreqDL_MHz, FreqUL_MHz,
+      RSSI, RSRP, RSRQ, SINR, Operador, Longitud, Latitud
+
+    Also accepts the legacy 15-column English format for backwards compatibility:
       Timestamp, Technology, State, MCC, MNC, LAC, CellID, Band,
       RSSI, RSRP, RSRQ, SINR, Operator, Longitude, Latitude
 
-    Delegates to process_lte_wardriving after reading the CSV.
-    That function handles both Spanish (RF firmware) and English (Android)
-    column names and filters out placeholder/unserved-cell rows.
+    Delegates to process_lte_wardriving, which handles both formats and
+    filters out placeholder/unserved-cell rows automatically.
     """
     try:
         df = read_csv(file_path, encoding="utf-8", sep=",", low_memory=False)
