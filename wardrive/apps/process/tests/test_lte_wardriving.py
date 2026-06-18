@@ -29,6 +29,26 @@ from apps.wardriving import LteCellType
 
 _PATCH_BULK = "apps.process.rf.bulk_upsert_by_keys"
 
+# Synthetic test data — clearly fictitious, never copied from field captures.
+_SYN_LAT = "10.5000001"
+_SYN_LON = "-70.5000001"
+_SYN_MCC = 310
+_SYN_MNC = 410
+_SYN_LAC = 10001
+_SYN_OPERATOR = "TestCarrier"
+_SYN_CELL_LEGACY = [25600001, 25600002, 25600003]  # eNodeB=100000, sectors 1-3
+_SYN_CELL_EXTENDED = 25600021  # eNodeB=100000, sector=21
+_SYN_CELL_MISSING_FREQ = 25600010  # eNodeB=100000, sector=10
+_SYN_ENODEB = 100000
+_SYN_SECTOR = 21
+_SYN_PCI = 12
+_SYN_EARFCN = 50001
+_SYN_LAC_SERIAL = 20002
+_SYN_CELL_SERIAL = 25600015  # eNodeB=100000, sector=15
+_SYN_PCI_SERIAL = 4
+_SYN_PCI_NEIGHBOR = 23
+_SYN_PCI_SERIAL_NEIGHBOR = 44
+
 
 def _df(csv_text: str):
     return read_csv(io.StringIO(csv_text), sep=",", low_memory=False)
@@ -38,31 +58,37 @@ def _df(csv_text: str):
 # Legacy format (15-column English, as produced by Android / old firmware)
 # ---------------------------------------------------------------------------
 
-LEGACY_EN_CSV = """\
+LEGACY_EN_CSV = f"""\
 Timestamp,Technology,State,MCC,MNC,LAC,CellID,Band,RSSI,RSRP,RSRQ,SINR,Operator,Longitude,Latitude
-2025-06-14 15:00:01,LTE,1,334,20,581,40918550,7,-106,-106,-8,0,TELCEL,-99.1332,19.4326
-1970-01-01 03:27:06,LTE,0,000,00,65535,268435455,,-106,-106,-7,0,TELCEL,,
-2025-06-14 15:00:02,LTE,1,334,20,581,40918551,7,-100,-100,-7,2,TELCEL,-99.1332,19.4326
+2025-06-14 15:00:01,LTE,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_LEGACY[0]},7,-106,-106,-8,0,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
+1970-01-01 03:27:06,LTE,0,000,00,65535,268435455,,-106,-106,-7,0,{_SYN_OPERATOR},,
+2025-06-14 15:00:02,LTE,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_LEGACY[1]},7,-100,-100,-7,2,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
 """
 
 # Legacy Spanish (RF firmware)
-LEGACY_ES_CSV = """\
+LEGACY_ES_CSV = f"""\
 Timestamp,Tecnología,Estado,MCC,MNC,LAC,CellID,Banda,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
-2025-06-14 15:00:03,LTE,1,334,20,581,40918552,7,-103,-103,-9,0,TELCEL,-99.1332,19.4326
+2025-06-14 15:00:03,LTE,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_LEGACY[2]},7,-103,-103,-9,0,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
+"""
+
+# Extended firmware schema — valid row with empty FreqDL_MHz / FreqUL_MHz
+EXTENDED_MISSING_FREQ_CSV = f"""\
+Timestamp,Tecnología,TipoCelda,Estado,MCC,MNC,LAC,CellID,eNodeB,Sector,PCI,Banda,EARFCN,FreqDL_MHz,FreqUL_MHz,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
+2025-06-14 15:00:05,LTE,serving,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_MISSING_FREQ},{_SYN_ENODEB},10,{_SYN_PCI},48,{_SYN_EARFCN},,,-85,-93,-12,8,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
 """
 
 # Extended firmware schema with serving + neighbor rows
-EXTENDED_CSV = """\
+EXTENDED_CSV = f"""\
 Timestamp,Tecnología,TipoCelda,Estado,MCC,MNC,LAC,CellID,eNodeB,Sector,PCI,Banda,EARFCN,FreqDL_MHz,FreqUL_MHz,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
-2025-06-14 15:00:05,LTE,serving,1,334,20,12345,39485461,154240,21,21,7,2825,2627.5,2507.5,-85,-93,-12,8,Telcel,-99.1332,19.4326
-2025-06-14 15:00:05,LTE,neighbor,1,334,20,12345,0,0,0,23,7,2825,2627.5,2507.5,0,-91,-11,0,Telcel,-99.1332,19.4326
+2025-06-14 15:00:05,LTE,serving,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_EXTENDED},{_SYN_ENODEB},{_SYN_SECTOR},{_SYN_SECTOR},7,2825,2627.5,2507.5,-85,-93,-12,8,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
+2025-06-14 15:00:05,LTE,neighbor,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},0,0,0,{_SYN_PCI_NEIGHBOR},7,2825,2627.5,2507.5,0,-91,-11,0,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
 """
 
 # Serial WebSerial export — identical to extended but prefixed with Source column
-SERIAL_SOURCE_CSV = """\
+SERIAL_SOURCE_CSV = f"""\
 Source,Timestamp,Tecnología,TipoCelda,Estado,MCC,MNC,LAC,CellID,eNodeB,Sector,PCI,Banda,EARFCN,FreqDL_MHz,FreqUL_MHz,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
-lte,2025-06-14 15:00:10,LTE,serving,1,334,20,99999,390,15,11,4,7,2825,2627.5,2507.5,-80,-88,-10,5,Telcel,-99.1332,19.4326
-lte,2025-06-14 15:00:10,LTE,neighbor,1,334,20,99999,0,0,0,44,7,2825,2627.5,2507.5,0,-95,-13,0,Telcel,-99.1332,19.4326
+lte,2025-06-14 15:00:10,LTE,serving,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC_SERIAL},{_SYN_CELL_SERIAL},{_SYN_ENODEB},15,{_SYN_PCI_SERIAL},7,2825,2627.5,2507.5,-80,-88,-10,5,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
+lte,2025-06-14 15:00:10,LTE,neighbor,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC_SERIAL},0,0,0,{_SYN_PCI_SERIAL_NEIGHBOR},7,2825,2627.5,2507.5,0,-95,-13,0,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
 """
 
 
@@ -119,7 +145,7 @@ class LegacySpanishFormatTests(SimpleTestCase):
 
     def test_provider_field_mapped(self):
         rows = _captured_rows(LEGACY_ES_CSV)
-        self.assertEqual(rows[0]["provider"], "TELCEL")
+        self.assertEqual(rows[0]["provider"], _SYN_OPERATOR)
 
 
 class ExtendedFormatTests(SimpleTestCase):
@@ -138,7 +164,7 @@ class ExtendedFormatTests(SimpleTestCase):
     def test_pci_earfcn_populated(self):
         rows = _captured_rows(EXTENDED_CSV)
         serving = next(r for r in rows if r["cell_type"] == LteCellType.SERVING)
-        self.assertEqual(serving["pci"], 21)
+        self.assertEqual(serving["pci"], _SYN_SECTOR)
         self.assertEqual(serving["earfcn"], 2825)
 
     def test_freq_fields_populated(self):
@@ -150,9 +176,9 @@ class ExtendedFormatTests(SimpleTestCase):
     def test_enodeb_sector_from_csv(self):
         rows = _captured_rows(EXTENDED_CSV)
         serving = next(r for r in rows if r["cell_type"] == LteCellType.SERVING)
-        # CSV explicitly provides eNodeB=154240, Sector=21
-        self.assertEqual(serving["enodeb_id"], 154240)
-        self.assertEqual(serving["sector_id"], 21)
+        # CSV explicitly provides eNodeB and Sector from synthetic constants
+        self.assertEqual(serving["enodeb_id"], _SYN_ENODEB)
+        self.assertEqual(serving["sector_id"], _SYN_SECTOR)
 
     def test_state_field_parsed(self):
         rows = _captured_rows(EXTENDED_CSV)
@@ -180,7 +206,7 @@ class SerialSourceColumnTests(SimpleTestCase):
     def test_neighbor_pci_distinct(self):
         rows = _captured_rows(SERIAL_SOURCE_CSV)
         neighbor = next(r for r in rows if r["cell_type"] == LteCellType.NEIGHBOR)
-        self.assertEqual(neighbor["pci"], 44)
+        self.assertEqual(neighbor["pci"], _SYN_PCI_SERIAL_NEIGHBOR)
 
 
 class KeyFieldsTest(SimpleTestCase):
@@ -245,7 +271,7 @@ class LteAndroidWrapperTests(SimpleTestCase):
     def test_extended_format_rf_fields_populated(self):
         rows = self._run_wrapper(EXTENDED_CSV)
         serving = next(r for r in rows if r["cell_type"] == LteCellType.SERVING)
-        self.assertEqual(serving["pci"], 21)
+        self.assertEqual(serving["pci"], _SYN_SECTOR)
         self.assertEqual(serving["earfcn"], 2825)
         self.assertAlmostEqual(float(serving["dl_freq_mhz"]), 2627.5)
 
@@ -284,3 +310,34 @@ class LteAndroidWrapperTests(SimpleTestCase):
         for row in captured:
             self.assertEqual(row["device_source"], SourceDevice.LTE_ANDROID)
             self.assertEqual(row["uploaded_by"], "test_user")
+
+
+class MissingFreqFieldsTests(SimpleTestCase):
+    """
+    Regression tests for the NaN bug: when FreqDL_MHz / FreqUL_MHz are empty
+    in the CSV, pandas.to_numeric produces float('nan').  float('nan') or 0
+    returns NaN (truthy in Python), which Django's DecimalField rejects with
+    '"nan": el valor debe ser un número decimal.'
+    """
+
+    def test_row_persisted_when_freq_empty(self):
+        rows = _captured_rows(EXTENDED_MISSING_FREQ_CSV)
+        self.assertEqual(len(rows), 1)
+
+    def test_dl_freq_defaults_to_zero(self):
+        rows = _captured_rows(EXTENDED_MISSING_FREQ_CSV)
+        self.assertEqual(float(rows[0]["dl_freq_mhz"]), 0.0)
+
+    def test_ul_freq_defaults_to_zero(self):
+        rows = _captured_rows(EXTENDED_MISSING_FREQ_CSV)
+        self.assertEqual(float(rows[0]["ul_freq_mhz"]), 0.0)
+
+    def test_other_fields_still_parsed(self):
+        rows = _captured_rows(EXTENDED_MISSING_FREQ_CSV)
+        row = rows[0]
+        self.assertEqual(row["earfcn"], _SYN_EARFCN)
+        self.assertEqual(row["pci"], _SYN_PCI)
+        self.assertEqual(row["rssi"], -85)
+        self.assertEqual(row["rsrp"], -93)
+        self.assertEqual(row["rsrq"], -12)
+        self.assertEqual(row["sinr"], 8)

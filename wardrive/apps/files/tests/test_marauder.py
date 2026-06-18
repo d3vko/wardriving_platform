@@ -115,7 +115,7 @@ class DetectDialectTests(SimpleTestCase):
         lines = [
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n",
-            "aa:bb:cc:dd:ee:ff,Net,[WPA2],2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n",
+            "aa:bb:cc:dd:ee:ff,Net,[WPA2],2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n",
         ]
         self.assertEqual(detect_dialect(lines), "csv_header")
 
@@ -124,7 +124,7 @@ class DetectDialectTests(SimpleTestCase):
             "WigleWifi-1.6,appRelease=2.72,model=Pixel,release=13\n",
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n",
-            "aa:bb:cc:dd:ee:ff,Net,[WPA2],2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n",
+            "aa:bb:cc:dd:ee:ff,Net,[WPA2],2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n",
         ]
         self.assertEqual(detect_dialect(lines), "csv_header")
 
@@ -132,7 +132,7 @@ class DetectDialectTests(SimpleTestCase):
         lines = [
             "MAC,SSID,Capabilities,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n",
-            "aa:bb:cc:dd:ee:ff,Fork,[WPA2-PSK][ESS],2026-01-01 00:00:00,11,-60,19.0,-99.0,2200,5,WIFI\n",
+            "aa:bb:cc:dd:ee:ff,Fork,[WPA2-PSK][ESS],2026-01-01 00:00:00,11,-60,10.0,-70.0,2200,5,WIFI\n",
         ]
         self.assertEqual(detect_dialect(lines), "csv_header")
 
@@ -158,7 +158,7 @@ class ParseLogWifiTests(SimpleTestCase):
     def test_gt_prefix_indexed(self):
         line = (
             "> 1 | 78:8c:b5:1a:29:d4,Area,[WPA2_PSK],2026-04-05 18:46:47,10,-42,"
-            "19.4112186,-99.1793900,2258.40,5.00,WIFI"
+            "10.5000001,-70.5000001,2258.40,5.00,WIFI"
         )
         row = parse_log_wifi(line)
         self.assertIsNotNone(row)
@@ -193,7 +193,7 @@ class ParseLogClassicAndMalformedTests(SimpleTestCase):
     def test_classic_ble(self):
         line = (
             "aa:bb:cc:dd:ee:ff,BLEDevice,[BLE],2026-03-25 00:22:27,0,-70,"
-            "19.0,-99.0,2200.0,5.0,BLE"
+            "10.0,-70.0,2200.0,5.0,BLE"
         )
         row = parse_log_classic(line)
         self.assertIsNotNone(row)
@@ -243,9 +243,9 @@ class ProcessFormatV2MockTests(SimpleTestCase):
             "#wardrive -serial\n",
             "StartingWardrive. Stop with stopscan\n",
             "> 1 | 78:8c:b5:1a:29:d4,Area,[WPA2_PSK],2026-04-05 18:46:47,10,-42,"
-            "19.4112186,-99.1793900,2258.40,5.00,WIFI\n",
+            "10.5000001,-70.5000001,2258.40,5.00,WIFI\n",
             "2 | 50:91:e3:9c:be:af,TP,[WPA2_PSK],2026-04-05 18:46:47,4,-46,"
-            "19.4112186,-99.1793900,2258.40,5.00,WIFI\n",
+            "10.5000001,-70.5000001,2258.40,5.00,WIFI\n",
         ]
         process_format_flipper_marauder_v2(lines=lines, uploaded_by="u")
         mock_bulk.assert_called_once()
@@ -290,7 +290,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:ff,TestNet,[WPA2],2026-01-01 00:00:00,"
-            "6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -311,7 +311,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "MAC,SSID,Capabilities,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "11:22:33:44:55:66,ForkNet,[WPA2-PSK-CCMP][ESS],[WPA2],"
-            "2026-01-01 00:00:00,11,-60,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,11,-60,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -329,7 +329,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "BSSID,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:01,BSSIDNet,[WPA2],2026-01-01 00:00:00,"
-            "1,-50,19.0,-99.0,2200,5,WIFI\n"
+            "1,-50,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -346,7 +346,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "MAC,SSID,Capabilities,FirstSeen,LastSeen,Channel,Frequency,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:02,ExtNet,[WPA3],2026-01-01 00:00:00,"
-            "2026-01-01 00:01:00,36,5180,-65,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:01:00,36,5180,-65,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -364,7 +364,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:03,MyBLE,[BLE],2026-01-01 00:00:00,"
-            "0,-70,19.0,-99.0,2200,5,BLE\n"
+            "0,-70,10.0,-70.0,2200,5,BLE\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -382,7 +382,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:04,WiGLENet,[WPA2],2026-01-01 00:00:00,"
-            "11,-55,19.0,-99.0,2200,5,WIFI\n"
+            "11,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -399,7 +399,7 @@ class CsvWithHeaderTests(SimpleTestCase):
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:05,NoGPS,[WPA2],2026-01-01 00:00:00,6,-55,0,0,0,0,WIFI\n"
-            "aa:bb:cc:dd:ee:06,HasGPS,[WPA2],2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "aa:bb:cc:dd:ee:06,HasGPS,[WPA2],2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -421,7 +421,7 @@ class EntrypointCompatTests(SimpleTestCase):
     def test_returns_3_tuple(self, _mock):
         lines = [
             "1 | aa:bb:cc:dd:ee:ff,Net,[WPA2],2026-01-01 00:00:00,"
-            "6,-55,19.0,-99.0,2200,5,WIFI\n",
+            "6,-55,10.0,-70.0,2200,5,WIFI\n",
         ]
         fd, path = tempfile.mkstemp(suffix=".log")
         with os.fdopen(fd, "w") as fh:
@@ -437,7 +437,7 @@ class EntrypointCompatTests(SimpleTestCase):
     def test_classic_log_file(self, mock_bulk):
         lines = [
             "34:6b:46:ec:ba:0b,MYNET,[WPA2_PSK],2026-03-25 00:22:27,11,-44,"
-            "19.411,-99.179,2258.0,5.0,WIFI\n",
+            "10.5,-70.5,2258.0,5.0,WIFI\n",
         ]
         fd, path = tempfile.mkstemp(suffix=".log")
         with os.fdopen(fd, "w") as fh:
@@ -508,7 +508,7 @@ class CsvSecuritySanitizationTests(SimpleTestCase):
             "MAC,SSID,Capabilities,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:10,TestNet,[WPA2-PSK-CCMP][ESS],2026-01-01 00:00:00,"
-            "6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -525,7 +525,7 @@ class CsvSecuritySanitizationTests(SimpleTestCase):
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:11,Net2,[WPA2],2026-01-01 00:00:00,"
-            "6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -542,7 +542,7 @@ class CsvSecuritySanitizationTests(SimpleTestCase):
             "MAC,SSID,Capabilities,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:12,EAPNet,[WPA2-EAP/SHA1-CCMP][RSN][ESS],"
-            "2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -559,7 +559,7 @@ class CsvSecuritySanitizationTests(SimpleTestCase):
             "MAC,SSID,Encryption,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
             "aa:bb:cc:dd:ee:13,PlainNet,WPA2,2026-01-01 00:00:00,"
-            "6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -574,7 +574,7 @@ class CsvSecuritySanitizationTests(SimpleTestCase):
         """Regression: log parser strips brackets via regex; sanitize_security must passthrough."""
         lines = [
             "34:6b:46:ec:ba:0b,MYNET,[WPA2_PSK],2026-03-25 00:22:27,11,-44,"
-            "19.411,-99.179,2258.0,5.0,WIFI\n",
+            "10.5,-70.5,2258.0,5.0,WIFI\n",
         ]
         fd, path = tempfile.mkstemp(suffix=".log")
         with os.fdopen(fd, "w") as fh:
@@ -601,7 +601,7 @@ class SsidNullHandlingTests(SimpleTestCase):
         csv = (
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
-            "aa:bb:cc:dd:ee:20,,[WPA2],2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "aa:bb:cc:dd:ee:20,,[WPA2],2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -618,7 +618,7 @@ class SsidNullHandlingTests(SimpleTestCase):
         csv = (
             "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,"
             "CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type\n"
-            "aa:bb:cc:dd:ee:21,   ,[WPA2],2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "aa:bb:cc:dd:ee:21,   ,[WPA2],2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         path = _write_tmp_csv(csv)
         try:
@@ -641,8 +641,8 @@ class SsidNullHandlingTests(SimpleTestCase):
             "SSID": "nan",
             "AuthMode": "WPA2",
             "Channel": "6",
-            "CurrentLatitude": "19.0",
-            "CurrentLongitude": "-99.0",
+            "CurrentLatitude": "10.0",
+            "CurrentLongitude": "-70.0",
         }
         row = coerce_row(raw, header_map)
         self.assertIsNotNone(row)
@@ -660,8 +660,8 @@ class SsidNullHandlingTests(SimpleTestCase):
             "SSID": "   ",
             "AuthMode": "WPA2",
             "Channel": "6",
-            "CurrentLatitude": "19.0",
-            "CurrentLongitude": "-99.0",
+            "CurrentLatitude": "10.0",
+            "CurrentLongitude": "-70.0",
         }
         row = coerce_row(raw, header_map)
         self.assertIsNotNone(row)
@@ -679,8 +679,8 @@ class SsidNullHandlingTests(SimpleTestCase):
             "SSID": "NULL",
             "AuthMode": "WPA2",
             "Channel": "6",
-            "CurrentLatitude": "19.0",
-            "CurrentLongitude": "-99.0",
+            "CurrentLatitude": "10.0",
+            "CurrentLongitude": "-70.0",
         }
         row = coerce_row(raw, header_map)
         self.assertIsNotNone(row)
@@ -720,7 +720,7 @@ class MininoProcessorTests(SimpleTestCase):
         from apps.process.minino import process_file_minino
         path = self._write_minino_csv(
             "aa:bb:cc:dd:ee:30,HomeNet,[WPA2-PSK-CCMP][ESS],"
-            "2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         try:
             process_file_minino(file_path=path, uploaded_by="test")
@@ -736,7 +736,7 @@ class MininoProcessorTests(SimpleTestCase):
         from apps.process.minino import process_file_minino
         path = self._write_minino_csv(
             "aa:bb:cc:dd:ee:31,CafeWiFi,[OPEN],"
-            "2026-01-01 00:00:00,1,-70,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,1,-70,10.0,-70.0,2200,5,WIFI\n"
         )
         try:
             process_file_minino(file_path=path, uploaded_by="test")
@@ -751,7 +751,7 @@ class MininoProcessorTests(SimpleTestCase):
         from apps.process.minino import process_file_minino
         path = self._write_minino_csv(
             "aa:bb:cc:dd:ee:32,BTDevice,[BLE],"
-            "2026-01-01 00:00:00,0,-65,19.0,-99.0,2200,5,BLE\n"
+            "2026-01-01 00:00:00,0,-65,10.0,-70.0,2200,5,BLE\n"
         )
         try:
             process_file_minino(file_path=path, uploaded_by="test")
@@ -767,7 +767,7 @@ class MininoProcessorTests(SimpleTestCase):
         from apps.process.minino import process_file_minino
         path = self._write_minino_csv(
             "aa:bb:cc:dd:ee:33,,[WPA2],"
-            "2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         try:
             process_file_minino(file_path=path, uploaded_by="test")
@@ -784,7 +784,7 @@ class MininoProcessorTests(SimpleTestCase):
         # Write without metadata line so pandas would previously emit 'nan'
         content = _MININO_HEADER + (
             "aa:bb:cc:dd:ee:34,nan,[WPA2],"
-            "2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         fd, path = tempfile.mkstemp(suffix=".csv")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -805,7 +805,7 @@ class MininoProcessorTests(SimpleTestCase):
         ])
         row = coerce_row(
             {"MAC": "aa:bb:cc:dd:ee:ff", "SSID": "nan", "AuthMode": "WPA2",
-             "Channel": "6", "CurrentLatitude": "19.0", "CurrentLongitude": "-99.0"},
+             "Channel": "6", "CurrentLatitude": "10.0", "CurrentLongitude": "-70.0"},
             header_map,
         )
         self.assertIsNotNone(row)
@@ -817,7 +817,7 @@ class MininoProcessorTests(SimpleTestCase):
         from apps.process.minino import process_file_minino
         path = self._write_minino_csv(
             "aa:bb:cc:dd:ee:35,   ,[WPA2],"
-            "2026-01-01 00:00:00,6,-55,19.0,-99.0,2200,5,WIFI\n"
+            "2026-01-01 00:00:00,6,-55,10.0,-70.0,2200,5,WIFI\n"
         )
         try:
             process_file_minino(file_path=path, uploaded_by="test")

@@ -30,6 +30,21 @@ def _to_int(val, default: int = 0) -> int:
         return default
 
 
+def _to_decimal(val, default: float = 0.0) -> float:
+    """Convert a value to float, returning default if None, NaN, or unparseable."""
+    if val is None:
+        return default
+    try:
+        if isna(val):
+            return default
+    except (TypeError, ValueError):
+        pass
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
 def process_lte_wardriving(
     device_source=SourceDevice.RF_CUSTOM_FIRMWARE_LTE,
     uploaded_by="Without Owner",
@@ -214,13 +229,13 @@ def process_lte_wardriving(
             "sector_id": int(sector) if sector is not None and not isna(sector) else 0,
             "pci": _to_int(instance_data.get("pci")),
             "earfcn": _to_int(instance_data.get("earfcn")),
-            "dl_freq_mhz": instance_data.get("dl_freq_mhz") or 0,
-            "ul_freq_mhz": instance_data.get("ul_freq_mhz") or 0,
+            "dl_freq_mhz": _to_decimal(instance_data.get("dl_freq_mhz")),
+            "ul_freq_mhz": _to_decimal(instance_data.get("ul_freq_mhz")),
             "first_seen": fs,
             "rssi": instance_data.get("rssi"),
-            "rsrp": instance_data.get("rsrp"),
-            "rsrq": instance_data.get("rsrq"),
-            "sinr": instance_data.get("sinr"),
+            "rsrp": _to_int(instance_data.get("rsrp")),
+            "rsrq": _to_int(instance_data.get("rsrq")),
+            "sinr": _to_int(instance_data.get("sinr")),
             "band": instance_data.get("band"),
             "provider": instance_data.get("provider") or "Not Provided",
             "current_longitude": instance_data.get("current_longitude"),
