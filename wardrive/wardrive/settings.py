@@ -476,3 +476,6 @@ CSRF_TRUSTED_ORIGINS = env.list(
         "https://*.tcp.ngrok.io",
     ],
 )
+
+# KML icon
+KML_ICON_HREF = env("KML_ICON_HREF", default="https://raw.githubusercontent.com/AdrianPardo99/flipper_zero_anims_assets/refs/heads/hide/Ultra-hide-branch/misc_icons/kml_icon-v2_wo_back.png")

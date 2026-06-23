@@ -4,6 +4,7 @@ from xml.sax.saxutils import escape
 import simplekml  # type: ignore[import-not-found]
 
 from django.http import HttpResponse
+from django.conf import settings
 
 
 def _build_description(rows: list[tuple[str, str]]) -> str:
@@ -30,7 +31,7 @@ def build_kml_bytes(
 ) -> bytes:
     """UTF-8 KML document bytes (shared by HTTP response and WebSocket binary frame)."""
     kml = simplekml.Kml()
-    icon_href = "https://raw.githubusercontent.com/AdrianPardo99/flipper_zero_anims_assets/refs/heads/hide/Ultra-hide-branch/misc_icons/kml_icon-v2_wo_back.png"
+    icon_href = settings.KML_ICON_HREF
 
     for obj in queryset.iterator(chunk_size=2000):
         lat = float(lat_fn(obj))
