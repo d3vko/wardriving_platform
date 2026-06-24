@@ -175,6 +175,7 @@ def build_kml_streaming_response(
             pin_color=pin_color,
             name_fn=name_fn,
             lat_fn=lat_fn,
+            lon_fn=lon_fn,
             extra_fn=extra_fn,
             should_cancel=should_cancel,
         ),
