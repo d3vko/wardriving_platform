@@ -5,6 +5,7 @@ from django.test import SimpleTestCase
 from lxml import etree
 
 from apps.wardriving.kml_utils import (
+    KML_NS,
     KmlExportCancelled,
     build_kml_bytes,
     iter_kml_chunks,
@@ -77,6 +78,23 @@ class BuildKmlBytesTests(SimpleTestCase):
         self._assert_valid_kml(body)
         self.assertNotIn(b"\x00", body)
         self.assertIn(b"Network", body)
+
+    def test_placemark_element_order_for_google_maps(self):
+        body = self._build(
+            name="TestNetwork",
+            extra={"ssid": "TestNetwork", "mac": _SYN_MAC},
+        )
+        root = etree.fromstring(body)
+        placemark = root.find(f".//{{{KML_NS}}}Placemark")
+        self.assertIsNotNone(placemark)
+        child_names = [etree.QName(child).localname for child in placemark]
+        self.assertEqual(
+            child_names,
+            ["name", "description", "styleUrl", "ExtendedData", "Point"],
+        )
+        style = root.find(f".//{{{KML_NS}}}Style")
+        self.assertIsNotNone(style)
+        self.assertEqual(style.get("id"), "wardrivePin")
 
     def test_coordinates_present(self):
         body = self._build(name="PointA")

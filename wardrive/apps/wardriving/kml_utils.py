@@ -47,21 +47,13 @@ def _build_description(rows: list[tuple[str, str]]) -> str:
     )
 
 
-def _placemark_element(
+def _document_style_element(
     *,
-    name: str,
-    lon: float,
-    lat: float,
+    style_id: str,
     pin_color: str,
     icon_href: str,
-    extra_data: dict,
 ) -> etree.Element:
-    placemark = etree.Element("Placemark", nsmap=KML_NSMAP)
-
-    name_el = etree.SubElement(placemark, "name")
-    name_el.text = _kml_text(name)
-
-    style = etree.SubElement(placemark, "Style")
+    style = etree.Element("Style", nsmap=KML_NSMAP, id=style_id)
     icon_style = etree.SubElement(style, "IconStyle")
     color_el = etree.SubElement(icon_style, "color")
     color_el.text = pin_color
@@ -70,6 +62,22 @@ def _placemark_element(
     icon = etree.SubElement(icon_style, "Icon")
     href_el = etree.SubElement(icon, "href")
     href_el.text = icon_href
+    return style
+
+
+def _placemark_element(
+    *,
+    name: str,
+    lon: float,
+    lat: float,
+    style_id: str,
+    extra_data: dict,
+) -> etree.Element:
+    """Build a Placemark; element order matches KML 2.2 / Google Maps expectations."""
+    placemark = etree.Element("Placemark", nsmap=KML_NSMAP)
+
+    name_el = etree.SubElement(placemark, "name")
+    name_el.text = _kml_text(name)
 
     if extra_data:
         description = etree.SubElement(placemark, "description")
@@ -81,6 +89,11 @@ def _placemark_element(
                 ]
             )
         )
+
+    style_url = etree.SubElement(placemark, "styleUrl")
+    style_url.text = f"#{style_id}"
+
+    if extra_data:
         extended = etree.SubElement(placemark, "ExtendedData")
         for key, value in extra_data.items():
             data = etree.SubElement(extended, "Data", name=_kml_text(key))
@@ -111,8 +124,17 @@ def iter_kml_chunks(
 ) -> Iterator[bytes]:
     """Yield KML bytes incrementally (keeps HTTP/WS connections alive during long exports)."""
     icon_href = settings.KML_ICON_HREF
+    style_id = "wardrivePin"
     yield b'<?xml version="1.0" encoding="UTF-8"?>\n'
     yield f'<kml xmlns="{KML_NS}"><Document>\n'.encode()
+    yield etree.tostring(
+        _document_style_element(
+            style_id=style_id,
+            pin_color=pin_color,
+            icon_href=icon_href,
+        ),
+        encoding="utf-8",
+    )
 
     for index, obj in enumerate(queryset.iterator(chunk_size=2000), start=1):
         _check_cancel(should_cancel)
@@ -123,8 +145,7 @@ def iter_kml_chunks(
             name=str(name_fn(obj)),
             lon=lon,
             lat=lat,
-            pin_color=pin_color,
-            icon_href=icon_href,
+            style_id=style_id,
             extra_data=extra_data,
         )
         yield etree.tostring(placemark, encoding="utf-8")
