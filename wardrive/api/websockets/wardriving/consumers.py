@@ -204,7 +204,21 @@ class WifiKmlConsumer(_AuthWsConsumer):
                 {"id": msg_id, "ok": True, "type": "kml_pending"},
             )
         )
-        status, body = await _wifi_kml(self.scope["user"], params)
+        try:
+            status, body = await _wifi_kml(self.scope["user"], params)
+        except Exception as exc:
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "id": msg_id,
+                        "ok": False,
+                        "status": 500,
+                        "detail": f"KML generation failed: {exc}",
+                    },
+                    default=str,
+                )
+            )
+            return
         if status == 200:
             content, filename = body
             await self.send(
@@ -255,7 +269,21 @@ class LteKmlConsumer(_AuthWsConsumer):
                 {"id": msg_id, "ok": True, "type": "kml_pending"},
             )
         )
-        status, body = await _lte_kml(self.scope["user"], params)
+        try:
+            status, body = await _lte_kml(self.scope["user"], params)
+        except Exception as exc:
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "id": msg_id,
+                        "ok": False,
+                        "status": 500,
+                        "detail": f"KML generation failed: {exc}",
+                    },
+                    default=str,
+                )
+            )
+            return
         if status == 200:
             content, filename = body
             await self.send(

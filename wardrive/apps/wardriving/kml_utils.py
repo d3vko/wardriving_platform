@@ -1,23 +1,91 @@
+import re
 from io import BytesIO
 from xml.sax.saxutils import escape
 
-import simplekml  # type: ignore[import-not-found]
+from lxml import etree
 
-from django.http import HttpResponse
 from django.conf import settings
+from django.http import HttpResponse
+
+KML_NS = "http://www.opengis.net/kml/2.2"
+KML_NSMAP = {None: KML_NS}
+
+# XML 1.0 valid character ranges (strip the rest).
+_INVALID_XML_CHARS = re.compile(
+    r"[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]"
+)
+
+
+def _kml_text(value) -> str:
+    if value is None:
+        return ""
+    return _INVALID_XML_CHARS.sub("", str(value))
+
+
+def _cdata_safe(text: str) -> str:
+    return text.replace("]]>", "]]]]><![CDATA[>")
 
 
 def _build_description(rows: list[tuple[str, str]]) -> str:
     table_rows = "".join(
-        f"<tr><td><b>{escape(str(k))}</b></td><td>{escape(str(v))}</td></tr>"
+        f"<tr><td><b>{escape(_kml_text(k))}</b></td>"
+        f"<td>{escape(_kml_text(v))}</td></tr>"
         for k, v in rows
     )
-    return (
-        "<![CDATA[<div style='font-family:Arial;font-size:13px;'>"
-        "<table border='1' cellpadding='4' cellspacing='0' style='border-collapse:collapse;'>"
+    return _cdata_safe(
+        "<div style='font-family:Arial;font-size:13px;'>"
+        "<table border='1' cellpadding='4' cellspacing='0' "
+        "style='border-collapse:collapse;'>"
         f"{table_rows}"
-        "</table></div>]]>"
+        "</table></div>"
     )
+
+
+def _placemark_element(
+    *,
+    name: str,
+    lon: float,
+    lat: float,
+    pin_color: str,
+    icon_href: str,
+    extra_data: dict,
+) -> etree.Element:
+    placemark = etree.Element("Placemark", nsmap=KML_NSMAP)
+
+    name_el = etree.SubElement(placemark, "name")
+    name_el.text = _kml_text(name)
+
+    style = etree.SubElement(placemark, "Style")
+    icon_style = etree.SubElement(style, "IconStyle")
+    color_el = etree.SubElement(icon_style, "color")
+    color_el.text = pin_color
+    scale_el = etree.SubElement(icon_style, "scale")
+    scale_el.text = "1.1"
+    icon = etree.SubElement(icon_style, "Icon")
+    href_el = etree.SubElement(icon, "href")
+    href_el.text = icon_href
+
+    if extra_data:
+        description = etree.SubElement(placemark, "description")
+        description.text = etree.CDATA(
+            _build_description(
+                [
+                    (str(k), "" if v is None else str(v))
+                    for k, v in extra_data.items()
+                ]
+            )
+        )
+        extended = etree.SubElement(placemark, "ExtendedData")
+        for key, value in extra_data.items():
+            data = etree.SubElement(extended, "Data", name=_kml_text(key))
+            value_el = etree.SubElement(data, "value")
+            value_el.text = _kml_text("" if value is None else value)
+
+    point = etree.SubElement(placemark, "Point")
+    coordinates = etree.SubElement(point, "coordinates")
+    coordinates.text = f"{lon},{lat},0"
+
+    return placemark
 
 
 def build_kml_bytes(
@@ -30,31 +98,28 @@ def build_kml_bytes(
     extra_fn,
 ) -> bytes:
     """UTF-8 KML document bytes (shared by HTTP response and WebSocket binary frame)."""
-    kml = simplekml.Kml()
     icon_href = settings.KML_ICON_HREF
-
-    for obj in queryset.iterator(chunk_size=2000):
-        lat = float(lat_fn(obj))
-        lon = float(lon_fn(obj))
-        extra_data = extra_fn(obj) or {}
-        name = str(name_fn(obj))
-
-        point = kml.newpoint(name=name, coords=[(lon, lat)])
-        point.style.iconstyle.icon.href = icon_href
-        point.style.iconstyle.color = pin_color
-        point.style.iconstyle.scale = 1.1
-
-        if extra_data:
-            point.description = _build_description(
-                [(str(k), "" if v is None else str(v)) for k, v in extra_data.items()]
-            )
-            ext = simplekml.ExtendedData()
-            for k, v in extra_data.items():
-                ext.newdata(name=str(k), value="" if v is None else str(v))
-            point.extendeddata = ext
-
     buffer = BytesIO()
-    buffer.write(kml.kml().encode("utf-8"))
+
+    with etree.xmlfile(buffer, encoding="utf-8") as xf:
+        xf.write_declaration()
+        with xf.element("kml", nsmap=KML_NSMAP):
+            with xf.element("Document"):
+                for obj in queryset.iterator(chunk_size=2000):
+                    lat = float(lat_fn(obj))
+                    lon = float(lon_fn(obj))
+                    extra_data = extra_fn(obj) or {}
+                    placemark = _placemark_element(
+                        name=str(name_fn(obj)),
+                        lon=lon,
+                        lat=lat,
+                        pin_color=pin_color,
+                        icon_href=icon_href,
+                        extra_data=extra_data,
+                    )
+                    xf.write(placemark)
+                    placemark.clear()
+
     return buffer.getvalue()
 
 
