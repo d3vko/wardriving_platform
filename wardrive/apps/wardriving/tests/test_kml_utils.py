@@ -65,7 +65,7 @@ class BuildKmlBytesTests(SimpleTestCase):
             extra={"ssid": "Broken]]>SSID"},
         )
         self._assert_valid_kml(body)
-        self.assertIn(b"]]]]><![CDATA[>", body)
+        self.assertIn(b"Broken]]&gt;SSID", body)
 
     def test_ssid_with_null_control_char(self):
         body = self._build(name="Net\x00work")
