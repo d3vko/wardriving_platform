@@ -1,9 +1,14 @@
 from types import SimpleNamespace
+import threading
 
 from django.test import SimpleTestCase
 from lxml import etree
 
-from apps.wardriving.kml_utils import build_kml_bytes
+from apps.wardriving.kml_utils import (
+    KmlExportCancelled,
+    build_kml_bytes,
+    iter_kml_chunks,
+)
 
 _SYN_LAT = 10.5000001
 _SYN_LON = -70.5000001
@@ -79,3 +84,25 @@ class BuildKmlBytesTests(SimpleTestCase):
         coords = root.find(".//{*}coordinates")
         self.assertIsNotNone(coords)
         self.assertEqual(coords.text, f"{_SYN_LON},{_SYN_LAT},0")
+
+    def test_cancel_stops_export(self):
+        obj = SimpleNamespace(
+            name="TestNetwork",
+            lat=_SYN_LAT,
+            lon=_SYN_LON,
+            extra={},
+        )
+        cancel = threading.Event()
+        cancel.set()
+        with self.assertRaises(KmlExportCancelled):
+            list(
+                iter_kml_chunks(
+                    queryset=_FakeQuerySet([obj]),
+                    pin_color="ff00ffff",
+                    name_fn=lambda o: o.name,
+                    lat_fn=lambda o: o.lat,
+                    lon_fn=lambda o: o.lon,
+                    extra_fn=lambda o: o.extra,
+                    should_cancel=cancel.is_set,
+                )
+            )

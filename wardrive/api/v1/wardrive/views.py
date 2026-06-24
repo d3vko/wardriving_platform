@@ -14,7 +14,14 @@ from rest_framework.response import Response
 
 from apps.misc.db_views import WardrivingVendorView
 from apps.wardriving.filters import LteWardrivingFilterSet, WifiWardrivingFilterSet
-from apps.wardriving.kml_utils import build_kml_response
+from apps.wardriving.kml_export import (
+    KmlExportError,
+    LTE_KML_EXPORT,
+    WIFI_KML_EXPORT,
+    resolve_lte_kml_queryset,
+    resolve_wifi_kml_queryset,
+)
+from apps.wardriving.kml_utils import build_kml_streaming_response
 from apps.wardriving.models import LTEWardriving
 
 from api.pagination import MapPlacesPagination
@@ -121,44 +128,23 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
     @action(methods=["get"], detail=False, url_path="kml")
     def download_kml(self, request, *args, **kwargs):
-        if not request.query_params.get(
-            "first_seen_after"
-        ) or not request.query_params.get("first_seen_before"):
-            return Response(
-                {
-                    "detail": (
-                        "KML export requires both first_seen_after and first_seen_before "
-                        "(ISO 8601) with a bounded date range."
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            queryset = resolve_wifi_kml_queryset(
+                request.user,
+                request.query_params,
             )
-        queryset = self.filter_queryset(self.get_queryset()).order_by("-first_seen")
-        if not queryset.exists():
-            return Response(
-                {
-                    "detail": "No WiFi samples to export for your user in this date range."
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        return build_kml_response(
+        except KmlExportError as exc:
+            return Response({"detail": exc.detail}, status=exc.status)
+        return build_kml_streaming_response(
             queryset=queryset,
-            filename=f"wifi_scans_{request.user.username}.kml",
-            pin_color="ff00ffff",  # yellow
-            name_fn=lambda o: o.ssid or o.mac,
-            lat_fn=lambda o: o.current_latitude,
-            lon_fn=lambda o: o.current_longitude,
-            extra_fn=lambda o: {
-                "vendor": o.vendor,
-                "mac": o.mac,
-                "ssid": o.ssid,
-                "auth_mode": o.auth_mode,
-                "signal_streng": o.signal_streng,
-                "device_source": o.device_source,
-                "uploaded_by": o.uploaded_by,
-                "type": o.type,
-                "first_seen": o.first_seen,
-            },
+            filename=WIFI_KML_EXPORT["filename_tpl"].format(
+                username=request.user.username
+            ),
+            pin_color=WIFI_KML_EXPORT["pin_color"],
+            name_fn=WIFI_KML_EXPORT["name_fn"],
+            lat_fn=WIFI_KML_EXPORT["lat_fn"],
+            lon_fn=WIFI_KML_EXPORT["lon_fn"],
+            extra_fn=WIFI_KML_EXPORT["extra_fn"],
         )
 
 
@@ -194,44 +180,21 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
     @action(methods=["get"], detail=False, url_path="kml")
     def download_kml(self, request, *args, **kwargs):
-        if not request.query_params.get(
-            "first_seen_after"
-        ) or not request.query_params.get("first_seen_before"):
-            return Response(
-                {
-                    "detail": (
-                        "KML export requires both first_seen_after and first_seen_before "
-                        "(ISO 8601) with a bounded date range."
-                    ),
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+        try:
+            queryset = resolve_lte_kml_queryset(
+                request.user,
+                request.query_params,
             )
-        queryset = self.filter_queryset(self.get_queryset()).order_by("-first_seen")
-        if not queryset.exists():
-            return Response(
-                {
-                    "detail": "No LTE samples to export for your user in this date range."
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        return build_kml_response(
+        except KmlExportError as exc:
+            return Response({"detail": exc.detail}, status=exc.status)
+        return build_kml_streaming_response(
             queryset=queryset,
-            filename=f"lte_scans_{request.user.username}.kml",
-            pin_color="ff0000ff",  # red
-            name_fn=lambda o: f"{o.provider or 'LTE'} {o.cell_id}",
-            lat_fn=lambda o: o.current_latitude,
-            lon_fn=lambda o: o.current_longitude,
-            extra_fn=lambda o: {
-                "provider": o.provider,
-                "cell_id": o.cell_id,
-                "mcc": o.mcc,
-                "mnc": o.mnc,
-                "lac": o.lac,
-                "band": o.band,
-                "rssi": o.rssi,
-                "tech": o.tech,
-                "device_source": o.device_source,
-                "uploaded_by": o.uploaded_by,
-                "first_seen": o.first_seen,
-            },
+            filename=LTE_KML_EXPORT["filename_tpl"].format(
+                username=request.user.username
+            ),
+            pin_color=LTE_KML_EXPORT["pin_color"],
+            name_fn=LTE_KML_EXPORT["name_fn"],
+            lat_fn=LTE_KML_EXPORT["lat_fn"],
+            lon_fn=LTE_KML_EXPORT["lon_fn"],
+            extra_fn=LTE_KML_EXPORT["extra_fn"],
         )

@@ -1,11 +1,11 @@
 import re
-from io import BytesIO
+from collections.abc import Callable, Iterator
 from xml.sax.saxutils import escape
 
 from lxml import etree
 
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 
 KML_NS = "http://www.opengis.net/kml/2.2"
 KML_NSMAP = {None: KML_NS}
@@ -14,6 +14,12 @@ KML_NSMAP = {None: KML_NS}
 _INVALID_XML_CHARS = re.compile(
     r"[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]"
 )
+
+ShouldCancel = Callable[[], bool] | None
+
+
+class KmlExportCancelled(Exception):
+    """Raised when a KML export is aborted (e.g. client disconnected)."""
 
 
 def _kml_text(value) -> str:
@@ -88,6 +94,45 @@ def _placemark_element(
     return placemark
 
 
+def _check_cancel(should_cancel: ShouldCancel) -> None:
+    if should_cancel and should_cancel():
+        raise KmlExportCancelled()
+
+
+def iter_kml_chunks(
+    *,
+    queryset,
+    pin_color: str,
+    name_fn,
+    lat_fn,
+    lon_fn,
+    extra_fn,
+    should_cancel: ShouldCancel = None,
+) -> Iterator[bytes]:
+    """Yield KML bytes incrementally (keeps HTTP/WS connections alive during long exports)."""
+    icon_href = settings.KML_ICON_HREF
+    yield b'<?xml version="1.0" encoding="UTF-8"?>\n'
+    yield f'<kml xmlns="{KML_NS}"><Document>\n'.encode()
+
+    for index, obj in enumerate(queryset.iterator(chunk_size=2000), start=1):
+        _check_cancel(should_cancel)
+        lat = float(lat_fn(obj))
+        lon = float(lon_fn(obj))
+        extra_data = extra_fn(obj) or {}
+        placemark = _placemark_element(
+            name=str(name_fn(obj)),
+            lon=lon,
+            lat=lat,
+            pin_color=pin_color,
+            icon_href=icon_href,
+            extra_data=extra_data,
+        )
+        yield etree.tostring(placemark, encoding="utf-8")
+        placemark.clear()
+
+    yield b"</Document></kml>\n"
+
+
 def build_kml_bytes(
     *,
     queryset,
@@ -96,31 +141,47 @@ def build_kml_bytes(
     lat_fn,
     lon_fn,
     extra_fn,
+    should_cancel: ShouldCancel = None,
 ) -> bytes:
-    """UTF-8 KML document bytes (shared by HTTP response and WebSocket binary frame)."""
-    icon_href = settings.KML_ICON_HREF
-    buffer = BytesIO()
+    """UTF-8 KML document bytes (shared by tests and WebSocket binary frame)."""
+    return b"".join(
+        iter_kml_chunks(
+            queryset=queryset,
+            pin_color=pin_color,
+            name_fn=name_fn,
+            lat_fn=lat_fn,
+            lon_fn=lon_fn,
+            extra_fn=extra_fn,
+            should_cancel=should_cancel,
+        )
+    )
 
-    with etree.xmlfile(buffer, encoding="utf-8") as xf:
-        xf.write_declaration()
-        with xf.element("kml", nsmap=KML_NSMAP):
-            with xf.element("Document"):
-                for obj in queryset.iterator(chunk_size=2000):
-                    lat = float(lat_fn(obj))
-                    lon = float(lon_fn(obj))
-                    extra_data = extra_fn(obj) or {}
-                    placemark = _placemark_element(
-                        name=str(name_fn(obj)),
-                        lon=lon,
-                        lat=lat,
-                        pin_color=pin_color,
-                        icon_href=icon_href,
-                        extra_data=extra_data,
-                    )
-                    xf.write(placemark)
-                    placemark.clear()
 
-    return buffer.getvalue()
+def build_kml_streaming_response(
+    *,
+    queryset,
+    filename: str,
+    pin_color: str,
+    name_fn,
+    lat_fn,
+    lon_fn,
+    extra_fn,
+    should_cancel: ShouldCancel = None,
+) -> StreamingHttpResponse:
+    """Stream a KML download without buffering the full file in memory."""
+    response = StreamingHttpResponse(
+        iter_kml_chunks(
+            queryset=queryset,
+            pin_color=pin_color,
+            name_fn=name_fn,
+            lat_fn=lat_fn,
+            extra_fn=extra_fn,
+            should_cancel=should_cancel,
+        ),
+        content_type="application/vnd.google-earth.kml+xml",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 def build_kml_response(
@@ -134,12 +195,9 @@ def build_kml_response(
     extra_fn,
 ) -> HttpResponse:
     """
-    Build and return a KML download from a queryset.
+    Build and return a buffered KML download from a queryset.
 
-    Each callable receives `obj` and returns:
-    - name_fn -> str for the placemark name
-    - lat_fn/lon_fn -> coordinates
-    - extra_fn -> dict of metadata for table/extended data
+    Prefer build_kml_streaming_response for large exports over HTTP.
     """
     body = build_kml_bytes(
         queryset=queryset,
