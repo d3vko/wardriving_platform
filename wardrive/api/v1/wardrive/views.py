@@ -75,9 +75,10 @@ filter_params = [
 list_params = pagination_params + filter_params
 
 kml_operation_description = (
-    "Exports KML for the authenticated user only. "
-    "**Required:** `first_seen_after` and `first_seen_before` (ISO 8601) to bound the range "
-    "and avoid timeouts; same filters as the list endpoint (including full-day normalization)."
+    "Exports lightweight KML optimized for Google My Maps (unzipped limit 5 MB). "
+    "**Required:** `first_seen_after` and `first_seen_before` (ISO 8601) to bound the range; "
+    "same filters as the list endpoint (including full-day normalization). "
+    "Returns 413 if the estimated export exceeds the Maps size limit."
 )
 
 
@@ -144,7 +145,6 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             name_fn=WIFI_KML_EXPORT["name_fn"],
             lat_fn=WIFI_KML_EXPORT["lat_fn"],
             lon_fn=WIFI_KML_EXPORT["lon_fn"],
-            extra_fn=WIFI_KML_EXPORT["extra_fn"],
         )
 
 
@@ -196,5 +196,5 @@ class LteWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             name_fn=LTE_KML_EXPORT["name_fn"],
             lat_fn=LTE_KML_EXPORT["lat_fn"],
             lon_fn=LTE_KML_EXPORT["lon_fn"],
-            extra_fn=LTE_KML_EXPORT["extra_fn"],
+            description_fn=LTE_KML_EXPORT["description_fn"],
         )

@@ -39,6 +39,7 @@ function formatElapsed(seconds: number): string {
 export default function KmlDownloads() {
   const [loading, setLoading] = useState<DownloadKind>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [afterDate, setAfterDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.startDate))
   const [beforeDate, setBeforeDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.endDate))
   const [elapsed, setElapsed] = useState(0)
@@ -68,6 +69,7 @@ export default function KmlDownloads() {
 
   const handleDownload = async (kind: Exclude<DownloadKind, null>) => {
     setError(null)
+    setErrorStatus(null)
     if (!afterDate || !beforeDate) {
       setError('Set both start and end dates of the range.')
       return
@@ -92,10 +94,13 @@ export default function KmlDownloads() {
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         setError(e.detail)
+        setErrorStatus(e.status)
       } else if (e instanceof Error) {
         setError(e.message)
+        setErrorStatus(null)
       } else {
         setError('Could not download the KML file.')
+        setErrorStatus(null)
       }
     } finally {
       setLoading(null)
@@ -109,9 +114,9 @@ export default function KmlDownloads() {
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         Download your scans by technology. Files include only data for the current session user.
-        The API requires a date range (<code>first_seen_after</code> and{' '}
-        <code>first_seen_before</code>) and normalizes each bound to the full calendar day in the
-        value&apos;s timezone. Very wide ranges may take longer to generate.
+        KML is optimized for <strong>Google My Maps</strong> (limit 5&nbsp;MB). The API requires a
+        date range (<code>first_seen_after</code> and <code>first_seen_before</code>) and
+        normalizes each bound to the full calendar day in the value&apos;s timezone.
       </Typography>
 
       <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -156,7 +161,14 @@ export default function KmlDownloads() {
       </LocalizationProvider>
 
       {error && (
-        <Alert sx={{ mb: 2 }} severity="error" onClose={() => setError(null)}>
+        <Alert
+          sx={{ mb: 2 }}
+          severity={errorStatus === 413 ? 'warning' : 'error'}
+          onClose={() => {
+            setError(null)
+            setErrorStatus(null)
+          }}
+        >
           {error}
         </Alert>
       )}

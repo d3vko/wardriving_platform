@@ -63,7 +63,6 @@ def _run_wifi_kml(user, params: dict, cancel_event: threading.Event):
             name_fn=WIFI_KML_EXPORT["name_fn"],
             lat_fn=WIFI_KML_EXPORT["lat_fn"],
             lon_fn=WIFI_KML_EXPORT["lon_fn"],
-            extra_fn=WIFI_KML_EXPORT["extra_fn"],
             should_cancel=cancel_event.is_set,
         )
     except KmlExportCancelled:
@@ -84,7 +83,7 @@ def _run_lte_kml(user, params: dict, cancel_event: threading.Event):
             name_fn=LTE_KML_EXPORT["name_fn"],
             lat_fn=LTE_KML_EXPORT["lat_fn"],
             lon_fn=LTE_KML_EXPORT["lon_fn"],
-            extra_fn=LTE_KML_EXPORT["extra_fn"],
+            description_fn=LTE_KML_EXPORT["description_fn"],
             should_cancel=cancel_event.is_set,
         )
     except KmlExportCancelled:
