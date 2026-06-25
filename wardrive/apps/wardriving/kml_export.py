@@ -172,8 +172,6 @@ def _wifi_placemark_description(obj) -> str:
             ("Señal", lambda o: _kml_field(getattr(o, "signal_streng", "")) or None),
             ("Tipo", lambda o: _kml_field(o.type) or None),
             ("Dispositivo", lambda o: _kml_field(o.device_source) or None),
-            ("Subido por", lambda o: _kml_field(o.uploaded_by) or None),
-            ("first_seen", lambda o: o.first_seen),
             (
                 "Altitud",
                 lambda o: (
@@ -247,8 +245,6 @@ def _lte_placemark_description(obj) -> str:
             ("RSRQ", lambda o: getattr(o, "rsrq", None)),
             ("SINR", lambda o: getattr(o, "sinr", None)),
             ("Dispositivo", lambda o: _kml_field(o.device_source) or None),
-            ("Subido por", lambda o: _kml_field(o.uploaded_by) or None),
-            ("first_seen", lambda o: o.first_seen),
         ],
     )
 
