@@ -121,10 +121,15 @@ export async function apiFetch<T = unknown>(
   return res.json() as Promise<T>
 }
 
-export async function apiFetchBlob(
+export type ApiFetchBlobResult = {
+  blob: Blob
+  contentType: string | null
+}
+
+export async function apiFetchBlobWithMeta(
   path: string,
   options: RequestInit & { skipAuth?: boolean } = {},
-): Promise<Blob> {
+): Promise<ApiFetchBlobResult> {
   const { skipAuth = false, ...init } = options
   const url = `${API_BASE}${path}`
   const headers = new Headers(init.headers)
@@ -154,7 +159,18 @@ export async function apiFetchBlob(
   }
 
   if (!res.ok) throw await parseError(res)
-  return res.blob()
+  return {
+    blob: await res.blob(),
+    contentType: res.headers.get('Content-Type'),
+  }
+}
+
+export async function apiFetchBlob(
+  path: string,
+  options: RequestInit & { skipAuth?: boolean } = {},
+): Promise<Blob> {
+  const { blob } = await apiFetchBlobWithMeta(path, options)
+  return blob
 }
 
 export { getTokens, setTokens, clearTokens }

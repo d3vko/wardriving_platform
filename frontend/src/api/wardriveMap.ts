@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchBlob } from '@/api/client'
+import { apiFetch, apiFetchBlob, apiFetchBlobWithMeta } from '@/api/client'
 
 export type WardrivingPlace = {
   mac: string
@@ -75,9 +75,15 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /** Long-running KML export over HTTP (streamed server-side; avoids WS idle timeouts). */
-export async function downloadWifiKml(params: KmlDownloadParams): Promise<void> {
-  const blob = await apiFetchBlob(`/wardrive/wifi/kml/${kmlQueryFromParams(params)}`)
-  downloadBlob(blob, 'wifi_scans.kml')
+export async function downloadWifiKml(
+  params: KmlDownloadParams,
+): Promise<{ isZip: boolean }> {
+  const { blob, contentType } = await apiFetchBlobWithMeta(
+    `/wardrive/wifi/kml/${kmlQueryFromParams(params)}`,
+  )
+  const isZip = contentType?.includes('zip') ?? false
+  downloadBlob(blob, isZip ? 'wifi_scans.zip' : 'wifi_scans.kml')
+  return { isZip }
 }
 
 export async function downloadLteKml(params: KmlDownloadParams): Promise<void> {

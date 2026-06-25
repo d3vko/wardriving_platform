@@ -15,10 +15,15 @@ from apps.wardriving.kml_export import (
     KmlExportError,
     LTE_KML_EXPORT,
     WIFI_KML_EXPORT,
+    plan_wifi_kml_export,
     resolve_lte_kml_queryset,
     resolve_wifi_kml_queryset,
 )
-from apps.wardriving.kml_utils import KmlExportCancelled, build_kml_bytes
+from apps.wardriving.kml_utils import (
+    KmlExportCancelled,
+    build_kml_bytes,
+    build_kml_zip_bytes,
+)
 
 KML_HEARTBEAT_SECONDS = 60
 
@@ -56,18 +61,37 @@ def _run_wifi_kml(user, params: dict, cancel_event: threading.Event):
         queryset = resolve_wifi_kml_queryset(user, params)
     except KmlExportError as exc:
         return exc.status, {"detail": exc.detail}
+    username = user.username
+    mode, chunk_size = plan_wifi_kml_export(queryset.count())
+    export = WIFI_KML_EXPORT
     try:
-        content = build_kml_bytes(
-            queryset=queryset,
-            pin_color=WIFI_KML_EXPORT["pin_color"],
-            name_fn=WIFI_KML_EXPORT["name_fn"],
-            lat_fn=WIFI_KML_EXPORT["lat_fn"],
-            lon_fn=WIFI_KML_EXPORT["lon_fn"],
-            should_cancel=cancel_event.is_set,
-        )
+        if mode == "single":
+            content = build_kml_bytes(
+                queryset=queryset,
+                pin_color=export["pin_color"],
+                name_fn=export["name_fn"],
+                lat_fn=export["lat_fn"],
+                lon_fn=export["lon_fn"],
+                description_fn=export["description_fn"],
+                should_cancel=cancel_event.is_set,
+            )
+            filename = export["filename_tpl"].format(username=username)
+        else:
+            content = build_kml_zip_bytes(
+                queryset=queryset,
+                chunk_size=chunk_size,
+                part_filename_tpl=export["part_filename_tpl"],
+                username=username,
+                pin_color=export["pin_color"],
+                name_fn=export["name_fn"],
+                lat_fn=export["lat_fn"],
+                lon_fn=export["lon_fn"],
+                description_fn=export["description_fn"],
+                should_cancel=cancel_event.is_set,
+            )
+            filename = export["zip_filename_tpl"].format(username=username)
     except KmlExportCancelled:
         return 499, {"detail": "KML export cancelled."}
-    filename = WIFI_KML_EXPORT["filename_tpl"].format(username=user.username)
     return 200, (content, filename)
 
 

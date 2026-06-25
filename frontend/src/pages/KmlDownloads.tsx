@@ -40,6 +40,7 @@ export default function KmlDownloads() {
   const [loading, setLoading] = useState<DownloadKind>(null)
   const [error, setError] = useState<string | null>(null)
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
+  const [zipSuccess, setZipSuccess] = useState(false)
   const [afterDate, setAfterDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.startDate))
   const [beforeDate, setBeforeDate] = useState(() => isoToDateInputValue(ANALYTICS_DEFAULTS.endDate))
   const [elapsed, setElapsed] = useState(0)
@@ -70,6 +71,7 @@ export default function KmlDownloads() {
   const handleDownload = async (kind: Exclude<DownloadKind, null>) => {
     setError(null)
     setErrorStatus(null)
+    setZipSuccess(false)
     if (!afterDate || !beforeDate) {
       setError('Set both start and end dates of the range.')
       return
@@ -89,8 +91,12 @@ export default function KmlDownloads() {
     setLoading(kind)
     try {
       const params = { first_seen_after, first_seen_before }
-      if (kind === 'wifi') await downloadWifiKml(params)
-      else await downloadLteKml(params)
+      if (kind === 'wifi') {
+        const { isZip } = await downloadWifiKml(params)
+        if (isZip) setZipSuccess(true)
+      } else {
+        await downloadLteKml(params)
+      }
     } catch (e: unknown) {
       if (e instanceof ApiError) {
         setError(e.detail)
@@ -114,9 +120,12 @@ export default function KmlDownloads() {
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={2}>
         Download your scans by technology. Files include only data for the current session user.
-        KML is optimized for <strong>Google My Maps</strong> (limit 5&nbsp;MB). The API requires a
-        date range (<code>first_seen_after</code> and <code>first_seen_before</code>) and
-        normalizes each bound to the full calendar day in the value&apos;s timezone.
+        Each point includes full metadata in the popup when you click it in Google My Maps.
+        KML is optimized for <strong>Google My Maps</strong> (limit 5&nbsp;MB per file). Large WiFi
+        exports are delivered as a <strong>ZIP</strong> with several KML files to import as separate
+        layers. The API requires a date range (<code>first_seen_after</code> and{' '}
+        <code>first_seen_before</code>) and normalizes each bound to the full calendar day in the
+        value&apos;s timezone.
       </Typography>
 
       <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -160,6 +169,17 @@ export default function KmlDownloads() {
         </Stack>
       </LocalizationProvider>
 
+      {zipSuccess && (
+        <Alert
+          sx={{ mb: 2 }}
+          severity="info"
+          onClose={() => setZipSuccess(false)}
+        >
+          Descarga completada como ZIP. Descomprime el archivo e importa cada{' '}
+          <code>.kml</code> en Google My Maps como una capa separada (máximo 10 capas por mapa).
+        </Alert>
+      )}
+
       {error && (
         <Alert
           sx={{ mb: 2 }}
@@ -185,7 +205,8 @@ export default function KmlDownloads() {
               <Box>
                 <Typography variant="h6">Download WiFi KML</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Export WiFi points with metadata for Google Earth and similar tools.
+                  Export WiFi points with full metadata (SSID, vendor, signal, device, etc.) for
+                  Google My Maps. Large ranges may download as a ZIP with multiple KML files.
                 </Typography>
               </Box>
               <Button

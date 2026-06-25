@@ -1,4 +1,6 @@
+import io
 import re
+import zipfile
 from collections.abc import Callable, Iterator
 from xml.sax.saxutils import escape
 
@@ -25,6 +27,16 @@ STYLE_ID = "wardrivePin"
 
 class KmlExportCancelled(Exception):
     """Raised when a KML export is aborted (e.g. client disconnected)."""
+
+
+class ListQuerySet:
+    """Minimal queryset facade over an in-memory list for KML batch exports."""
+
+    def __init__(self, items):
+        self._items = list(items)
+
+    def iterator(self, chunk_size=2000):
+        yield from self._items
 
 
 def _kml_text(value) -> str:
@@ -180,4 +192,91 @@ def build_kml_response(
         content_type="application/vnd.google-earth.kml+xml",
     )
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+def build_kml_zip_bytes(
+    *,
+    queryset,
+    chunk_size: int,
+    part_filename_tpl: str,
+    username: str,
+    pin_color: str,
+    name_fn,
+    lat_fn,
+    lon_fn,
+    description_fn=None,
+    should_cancel: ShouldCancel = None,
+) -> bytes:
+    """Build a ZIP of multiple KML parts, each under the Maps size budget."""
+    buffer = io.BytesIO()
+    part = 0
+    batch: list = []
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for obj in queryset.iterator(chunk_size=2000):
+            _check_cancel(should_cancel)
+            batch.append(obj)
+            if len(batch) >= chunk_size:
+                part += 1
+                kml = build_kml_bytes(
+                    queryset=ListQuerySet(batch),
+                    pin_color=pin_color,
+                    name_fn=name_fn,
+                    lat_fn=lat_fn,
+                    lon_fn=lon_fn,
+                    description_fn=description_fn,
+                    should_cancel=should_cancel,
+                )
+                zf.writestr(
+                    part_filename_tpl.format(username=username, part=part),
+                    kml,
+                )
+                batch = []
+        if batch:
+            part += 1
+            kml = build_kml_bytes(
+                queryset=ListQuerySet(batch),
+                pin_color=pin_color,
+                name_fn=name_fn,
+                lat_fn=lat_fn,
+                lon_fn=lon_fn,
+                description_fn=description_fn,
+                should_cancel=should_cancel,
+            )
+            zf.writestr(
+                part_filename_tpl.format(username=username, part=part),
+                kml,
+            )
+    return buffer.getvalue()
+
+
+def build_kml_zip_response(
+    *,
+    queryset,
+    chunk_size: int,
+    zip_filename: str,
+    part_filename_tpl: str,
+    username: str,
+    pin_color: str,
+    name_fn,
+    lat_fn,
+    lon_fn,
+    description_fn=None,
+    should_cancel: ShouldCancel = None,
+) -> HttpResponse:
+    """Return a ZIP download with one KML file per chunk."""
+    body = build_kml_zip_bytes(
+        queryset=queryset,
+        chunk_size=chunk_size,
+        part_filename_tpl=part_filename_tpl,
+        username=username,
+        pin_color=pin_color,
+        name_fn=name_fn,
+        lat_fn=lat_fn,
+        lon_fn=lon_fn,
+        description_fn=description_fn,
+        should_cancel=should_cancel,
+    )
+    response = HttpResponse(body, content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{zip_filename}"'
     return response

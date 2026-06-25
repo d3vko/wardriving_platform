@@ -18,10 +18,11 @@ from apps.wardriving.kml_export import (
     KmlExportError,
     LTE_KML_EXPORT,
     WIFI_KML_EXPORT,
+    plan_wifi_kml_export,
     resolve_lte_kml_queryset,
     resolve_wifi_kml_queryset,
 )
-from apps.wardriving.kml_utils import build_kml_streaming_response
+from apps.wardriving.kml_utils import build_kml_streaming_response, build_kml_zip_response
 from apps.wardriving.models import LTEWardriving
 
 from api.pagination import MapPlacesPagination
@@ -75,10 +76,12 @@ filter_params = [
 list_params = pagination_params + filter_params
 
 kml_operation_description = (
-    "Exports lightweight KML optimized for Google My Maps (unzipped limit 5 MB). "
+    "Exports KML optimized for Google My Maps (unzipped limit 5 MB per file). "
+    "Each placemark includes full metadata in the popup description. "
     "**Required:** `first_seen_after` and `first_seen_before` (ISO 8601) to bound the range; "
     "same filters as the list endpoint (including full-day normalization). "
-    "Returns 413 if the estimated export exceeds the Maps size limit."
+    "WiFi exports that exceed the size budget return a ZIP with multiple KML parts. "
+    "LTE returns 413 if the estimated export exceeds the Maps size limit."
 )
 
 
@@ -136,15 +139,33 @@ class WifiWardrivingViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             )
         except KmlExportError as exc:
             return Response({"detail": exc.detail}, status=exc.status)
-        return build_kml_streaming_response(
+        username = request.user.username
+        mode, chunk_size = plan_wifi_kml_export(queryset.count())
+        if mode == "single":
+            return build_kml_streaming_response(
+                queryset=queryset,
+                filename=WIFI_KML_EXPORT["filename_tpl"].format(
+                    username=username
+                ),
+                pin_color=WIFI_KML_EXPORT["pin_color"],
+                name_fn=WIFI_KML_EXPORT["name_fn"],
+                lat_fn=WIFI_KML_EXPORT["lat_fn"],
+                lon_fn=WIFI_KML_EXPORT["lon_fn"],
+                description_fn=WIFI_KML_EXPORT["description_fn"],
+            )
+        return build_kml_zip_response(
             queryset=queryset,
-            filename=WIFI_KML_EXPORT["filename_tpl"].format(
-                username=request.user.username
+            chunk_size=chunk_size,
+            zip_filename=WIFI_KML_EXPORT["zip_filename_tpl"].format(
+                username=username
             ),
+            part_filename_tpl=WIFI_KML_EXPORT["part_filename_tpl"],
+            username=username,
             pin_color=WIFI_KML_EXPORT["pin_color"],
             name_fn=WIFI_KML_EXPORT["name_fn"],
             lat_fn=WIFI_KML_EXPORT["lat_fn"],
             lon_fn=WIFI_KML_EXPORT["lon_fn"],
+            description_fn=WIFI_KML_EXPORT["description_fn"],
         )
 
 
