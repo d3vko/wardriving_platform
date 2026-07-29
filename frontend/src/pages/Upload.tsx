@@ -24,7 +24,7 @@ import {
   InsertDriveFile as FileIcon,
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material'
-import { getDeviceSources, uploadFiles } from '@/api/files'
+import { getDeviceSources, MAX_UPLOAD_FILES, uploadFiles } from '@/api/files'
 import type { DeviceSource } from '@/api/files'
 import { ApiError } from '@/api/client'
 
@@ -41,6 +41,7 @@ export default function Upload() {
   const [files, setFiles] = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
   const [results, setResults] = useState<UploadResult[] | null>(null)
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -81,9 +82,12 @@ export default function Upload() {
     if (files.length === 0) { setFieldError('Add at least one file'); return }
     setFieldError(null)
     setLoading(true)
+    setUploadProgress({ done: 0, total: files.length })
     setResults(null)
     try {
-      const uploaded = await uploadFiles(files, deviceSource)
+      const uploaded = await uploadFiles(files, deviceSource, (done, total) => {
+        setUploadProgress({ done, total })
+      })
       const res: UploadResult[] = uploaded.map((u, i) => ({
         filename: files[i]?.name ?? u.source,
         ok: true,
@@ -96,6 +100,7 @@ export default function Upload() {
       setSnackbar({ open: true, message: msg, severity: 'error' })
     } finally {
       setLoading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -167,7 +172,7 @@ export default function Upload() {
             Drag files here or click to browse
           </Typography>
           <Typography variant="body2" color="text.secondary" mt={0.5}>
-            You can select multiple files
+            You can select multiple files. Uploads larger than {MAX_UPLOAD_FILES} files are sent in batches.
           </Typography>
         </Box>
 
@@ -227,7 +232,19 @@ export default function Upload() {
           </Card>
         )}
 
-        {loading && <LinearProgress />}
+        {loading && (
+          <Box>
+            <LinearProgress
+              variant={uploadProgress ? 'determinate' : 'indeterminate'}
+              value={uploadProgress ? (uploadProgress.done / uploadProgress.total) * 100 : undefined}
+            />
+            {uploadProgress && (
+              <Typography variant="caption" color="text.secondary" mt={0.75} display="block">
+                Uploading {uploadProgress.done}/{uploadProgress.total} files
+              </Typography>
+            )}
+          </Box>
+        )}
 
         <Button
           variant="contained"
@@ -237,7 +254,9 @@ export default function Upload() {
           startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <CloudUploadIcon />}
           sx={{ alignSelf: 'flex-start' }}
         >
-          {loading ? 'Uploading…' : `Upload ${files.length > 0 ? `(${files.length})` : ''}`}
+          {loading
+            ? `Uploading… ${uploadProgress ? `(${uploadProgress.done}/${uploadProgress.total})` : ''}`
+            : `Upload ${files.length > 0 ? `(${files.length})` : ''}`}
         </Button>
       </Stack>
 

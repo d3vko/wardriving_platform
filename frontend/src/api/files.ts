@@ -19,14 +19,13 @@ export interface FileUploaded {
   hash_sha256: string | null
 }
 
+export const MAX_UPLOAD_FILES = 100
+
 export function getDeviceSources(): Promise<DeviceSourcesResponse> {
   return apiFetch<DeviceSourcesResponse>('/device-sources/', { skipAuth: true })
 }
 
-export function uploadFiles(
-  files: File[],
-  deviceSource: string,
-): Promise<FileUploaded[]> {
+function uploadFilesBatch(files: File[], deviceSource: string): Promise<FileUploaded[]> {
   const form = new FormData()
   files.forEach((f) => form.append('files', f))
   form.append('device_source', deviceSource)
@@ -35,4 +34,26 @@ export function uploadFiles(
     method: 'POST',
     body: form,
   })
+}
+
+export async function uploadFiles(
+  files: File[],
+  deviceSource: string,
+  onBatchProgress?: (done: number, total: number) => void,
+): Promise<FileUploaded[]> {
+  const uploaded: FileUploaded[] = []
+  const total = files.length
+  let done = 0
+
+  if (total === 0) return uploaded
+
+  for (let start = 0; start < total; start += MAX_UPLOAD_FILES) {
+    const batch = files.slice(start, start + MAX_UPLOAD_FILES)
+    const batchUploaded = await uploadFilesBatch(batch, deviceSource)
+    uploaded.push(...batchUploaded)
+    done += batch.length
+    onBatchProgress?.(done, total)
+  }
+
+  return uploaded
 }
