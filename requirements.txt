@@ -24,3 +24,4 @@ boto3>=1.35.0
 channels==4.3.2
 channels-redis==4.2.1
 daphne==4.2.1
+sentry-sdk[django]>=2.0.0

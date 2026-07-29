@@ -1,0 +1,13 @@
+---
+description: Usar el package manager del proyecto; no npm por defecto
+alwaysApply: true
+---
+
+# Gestores de paquetes (JS/TS)
+
+- **No usar `npm` como estrategia por defecto** en ningún proyecto.
+- Detectar el gestor del repo por lockfile/scripts (`bun.lockb` → Bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → Yarn, etc.) e **instalar/actualizar solo con ese gestor**.
+- Si falta el binario en el host, instalarlo o ejecutarlo vía contenedor oficial del mismo gestor; **no caer a npm** “porque está disponible”.
+- Si el lockfile del gestor canónico queda desfasado (p. ej. `package.json` cambió), regenerarlo con **ese** gestor (`bun install`, `pnpm install`, …), no con npm.
+- Si hace falta **cambiar** de gestor (p. ej. migrar a Bun/pnpm), **proponerlo en el plan o preguntar al usuario** antes de migrar; no migrar ni mezclar lockfiles por iniciativa propia.
+- Evitar generar o actualizar `package-lock.json` en proyectos Bun/pnpm/Yarn salvo que el usuario lo pida explícitamente.

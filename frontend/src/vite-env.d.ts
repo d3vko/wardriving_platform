@@ -18,6 +18,9 @@ interface ImportMetaEnv {
   readonly VITE_EVENT_LOGO_ALT: string
   readonly VITE_EVENT_LOGO_LINK_URL: string
   readonly VITE_EVENT_LOGO_LINK_LABEL: string
+  readonly VITE_SENTRY_DSN: string
+  readonly VITE_SENTRY_ENVIRONMENT: string
+  readonly VITE_SENTRY_TRACES_SAMPLE_RATE: string
 }
 
 interface ImportMeta {

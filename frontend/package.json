@@ -16,6 +16,7 @@
     "@mui/material": "^6.4.0",
     "@mui/x-charts": "^8.28.0",
     "@mui/x-date-pickers": "^8.27.2",
+    "@sentry/react": "^10.68.0",
     "dayjs": "^1.11.20",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",

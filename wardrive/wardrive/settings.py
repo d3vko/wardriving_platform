@@ -479,3 +479,21 @@ CSRF_TRUSTED_ORIGINS = env.list(
 
 # KML icon
 KML_ICON_HREF = env("KML_ICON_HREF", default="https://raw.githubusercontent.com/AdrianPardo99/flipper_zero_anims_assets/refs/heads/hide/Ultra-hide-branch/misc_icons/kml_icon-v2_wo_back.png")
+
+# GlitchTip (Sentry-compatible SDK). Empty SENTRY_DSN disables init.
+_SENTRY_DSN = env("SENTRY_DSN", default="")
+if _SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+        ],
+        environment=env("SENTRY_ENVIRONMENT", default="container"),
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        send_default_pii=True,
+    )
