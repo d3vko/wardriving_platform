@@ -8,6 +8,7 @@ so the canonical → model field mapping lives in exactly one place.
 from __future__ import annotations
 
 from apps.files.utils import bulk_upsert_by_keys, wardriving_better_obj_fn
+from apps.wardriving.geo import enrich_row_location
 
 from .schema import CanonicalRow
 
@@ -28,7 +29,8 @@ def _to_model_dict(row: CanonicalRow, device_source: str, uploaded_by: str) -> d
         "rssi": row.rssi,
         "device_source": device_source,
     }
-    return {k: v for k, v in d.items() if v is not None}
+    d = {k: v for k, v in d.items() if v is not None}
+    return enrich_row_location(d)
 
 
 def persist_canonical_rows(
@@ -55,6 +57,7 @@ def persist_canonical_rows(
             "first_seen",
             "current_latitude",
             "current_longitude",
+            "location",
             "altitude_meters",
             "accuracy_meters",
             "type",

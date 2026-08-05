@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     # Config whitenoise
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
+    "django.contrib.gis",
     # Third-party apps
     "rest_framework",
     "corsheaders",
@@ -86,7 +87,10 @@ ASGI_APPLICATION = "wardrive.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": env("DB_ENGINE", default="django.db.backends.postgresql"),
+        "ENGINE": env(
+            "DB_ENGINE",
+            default="django.contrib.gis.db.backends.postgis",
+        ),
         "NAME": env("DB_NAME", default=""),
         "USER": env("DB_USER", default=""),
         "PASSWORD": env("DB_PASSWORD", default=""),
@@ -94,6 +98,17 @@ DATABASES = {
         "PORT": env("DB_PORT", default=0, cast=int),
     }
 }
+
+# Rutas de libs GIS en la imagen Debian slim (libgdal36 / libgeos-c1t64).
+# Override vía env si el host o la distro cambian de SONAME.
+GDAL_LIBRARY_PATH = env(
+    "GDAL_LIBRARY_PATH",
+    default="/usr/lib/x86_64-linux-gnu/libgdal.so.36",
+)
+GEOS_LIBRARY_PATH = env(
+    "GEOS_LIBRARY_PATH",
+    default="/usr/lib/x86_64-linux-gnu/libgeos_c.so.1",
+)
 
 
 AUTH_PASSWORD_VALIDATORS = [

@@ -7,8 +7,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.13-slim
 
+# GDAL/GEOS/PROJ requeridos por django.contrib.gis (PostGIS).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gettext netcat-traditional \
+    && apt-get install -y --no-install-recommends \
+        gettext \
+        netcat-traditional \
+        gdal-bin \
+        libgdal36 \
+        libgeos-c1t64 \
+        libproj25 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages

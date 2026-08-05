@@ -1,4 +1,4 @@
-from django.db import models
+from django.contrib.gis.db import models
 from django.db.models import Q
 from django.db.models.functions import Upper, Substr
 from django.utils.timezone import now
@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 
 from apps.core.models import WardriveBaseModel, SourceDevice
 from apps.wardriving import LteCellType
+from apps.wardriving.geo import point_from_lat_lon
 
 
 class Wardriving(WardriveBaseModel):
@@ -24,6 +25,12 @@ class Wardriving(WardriveBaseModel):
     )
     current_longitude = models.DecimalField(
         max_digits=13, decimal_places=7, verbose_name="Longitude", default=0
+    )
+    location = models.PointField(
+        srid=4326,
+        null=True,
+        blank=True,
+        verbose_name="Location (WGS84)",
     )
     altitude_meters = models.DecimalField(
         max_digits=10,
@@ -65,6 +72,25 @@ class Wardriving(WardriveBaseModel):
     def __str__(self):
         device = self.ssid or self.type or "Unknown Device"
         return f"{device} ({self.mac})"
+
+    def sync_location_from_coords(self):
+        self.location = point_from_lat_lon(
+            self.current_latitude, self.current_longitude
+        )
+
+    def save(self, *args, **kwargs):
+        self.sync_location_from_coords()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            if (
+                "current_latitude" in update_fields
+                or "current_longitude" in update_fields
+                or "location" in update_fields
+            ):
+                update_fields.add("location")
+            kwargs["update_fields"] = list(update_fields)
+        return super().save(*args, **kwargs)
 
     def is_default_data(self):
         # Check current_latitude / current_longitude
@@ -146,6 +172,12 @@ class LTEWardriving(WardriveBaseModel):
     current_longitude = models.DecimalField(
         max_digits=13, decimal_places=7, verbose_name="Longitude", default=0
     )
+    location = models.PointField(
+        srid=4326,
+        null=True,
+        blank=True,
+        verbose_name="Location (WGS84)",
+    )
     tech = models.TextField(verbose_name="Technology", default="LTE")
 
     class Meta:
@@ -166,6 +198,25 @@ class LTEWardriving(WardriveBaseModel):
 
     def __str__(self):
         return f"`{self.pk}`:{self.mcc}-{self.mnc}-{self.lac} : ({self.cell_id})"
+
+    def sync_location_from_coords(self):
+        self.location = point_from_lat_lon(
+            self.current_latitude, self.current_longitude
+        )
+
+    def save(self, *args, **kwargs):
+        self.sync_location_from_coords()
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            if (
+                "current_latitude" in update_fields
+                or "current_longitude" in update_fields
+                or "location" in update_fields
+            ):
+                update_fields.add("location")
+            kwargs["update_fields"] = list(update_fields)
+        return super().save(*args, **kwargs)
 
     def is_default_data(self):
         # Check current_latitude / current_longitude

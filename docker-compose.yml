@@ -59,7 +59,9 @@ services:
     restart: on-failure
 
   wardrive_db:
-    image: postgres:17
+    # PostGIS sobre PostgreSQL 17. Mantiene el volumen wardriving_postgres_db
+    # (mismo major PG); no recrear el volumen al cambiar de postgres:17.
+    image: postgis/postgis:17-3.5
     environment:
       POSTGRES_PASSWORD: postgres
     volumes:

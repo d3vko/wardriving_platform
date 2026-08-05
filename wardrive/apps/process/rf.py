@@ -11,6 +11,7 @@ from django.utils.timezone import is_naive, make_aware, now
 from datetime import datetime
 
 from apps.files.utils import bulk_upsert_by_keys, wardriving_better_obj_fn
+from apps.wardriving.geo import enrich_row_location
 from apps.wardriving.models import LTEWardriving, Wardriving, SourceDevice
 from apps.wardriving import LteCellType
 
@@ -242,7 +243,7 @@ def process_lte_wardriving(
             "current_latitude": instance_data.get("current_latitude"),
         }
         row = {k: v for k, v in row.items() if v is not None}
-        rows.append(row)
+        rows.append(enrich_row_location(row))
 
     return bulk_upsert_by_keys(
         model=LTEWardriving,
@@ -277,6 +278,7 @@ def process_lte_wardriving(
             "provider",
             "current_longitude",
             "current_latitude",
+            "location",
         ],
         only_fields=[
             "id",
@@ -496,7 +498,7 @@ def process_wifi_rf_wardriving(
             row["accuracy_meters"] = rec["accuracy_meters"]
 
         row = {k: v for k, v in row.items() if v is not None}
-        rows.append(row)
+        rows.append(enrich_row_location(row))
 
     update_fields = [
         "ssid",
@@ -504,6 +506,7 @@ def process_wifi_rf_wardriving(
         "first_seen",
         "current_latitude",
         "current_longitude",
+        "location",
         "rssi",
         "device_source",
         "type",

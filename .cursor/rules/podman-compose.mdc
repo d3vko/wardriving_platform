@@ -1,0 +1,11 @@
+---
+description: Usar siempre podman-compose (nunca docker compose) en este proyecto
+alwaysApply: true
+---
+
+# Orquestación: podman-compose
+
+- **Siempre usar `podman-compose`**, nunca `docker compose` / `docker-compose`.
+- El fichero de definición puede seguir siendo `docker-compose.yml` (Compose Spec); lo que cambia es el **cliente**: Podman + `podman-compose`.
+- En docs, runbooks, ejemplos de shell y respuestas del agente: escribir `podman-compose`, no `docker compose`.
+- Volúmenes con etiqueta SELinux (`:Z`) encajan con Podman; no sustituir por flujos Docker Desktop salvo indicación explícita del repo.
