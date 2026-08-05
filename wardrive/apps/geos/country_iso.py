@@ -16,6 +16,10 @@ COUNTRY_NAME_TO_ISO2: dict[str, str] = {
     "canada": "CA",
     "mexico": "MX",
     "méxico": "MX",
+    # Mojibake UTF-8→Latin-1 que aparece en OGR/GPKG mal etiquetado
+    "mã©xico": "MX",
+    "mãxico": "MX",
+    "mÃ©xico": "MX",
     # Central America
     "belize": "BZ",
     "costa rica": "CR",
@@ -104,14 +108,32 @@ _NORMALIZED_TO_ISO2: dict[str, str] = {
 }
 
 
+def _fix_mojibake(text: str) -> str:
+    """Corrige UTF-8 leído como Latin-1 (p. ej. 'MÃ©xico' → 'México')."""
+    if "Ã" not in text and "Â" not in text:
+        return text
+    try:
+        fixed = text.encode("latin-1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return text
+    if fixed != text and ("Ã" not in fixed and "Â" not in fixed):
+        return fixed
+    return text
+
+
 def country_name_to_iso2(name: str | None) -> str | None:
     """Resuelve nombre de país a ISO-2, o None si no hay match."""
     if not name:
         return None
-    raw = name.strip().lower()
-    if raw in COUNTRY_NAME_TO_ISO2:
-        return COUNTRY_NAME_TO_ISO2[raw]
-    return _NORMALIZED_TO_ISO2.get(_normalize_name(name))
+    candidates = [name.strip(), _fix_mojibake(name.strip())]
+    for cand in candidates:
+        raw = cand.lower()
+        if raw in COUNTRY_NAME_TO_ISO2:
+            return COUNTRY_NAME_TO_ISO2[raw]
+        mapped = _NORMALIZED_TO_ISO2.get(_normalize_name(cand))
+        if mapped:
+            return mapped
+    return None
 
 
 def is_americas_un_region(region: str | None) -> bool:

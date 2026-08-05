@@ -89,11 +89,27 @@ def _get_attr(feat: Any, field: Optional[str]) -> Any:
             return None
 
 
+def _fix_mojibake(text: str) -> str:
+    """Corrige UTF-8 leído como Latin-1 (p. ej. 'MÃ©xico' → 'México')."""
+    if "Ã" not in text and "Â" not in text:
+        return text
+    try:
+        fixed = text.encode("latin-1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return text
+    # Solo aceptar si el arreglo reduce mojibake típico
+    if fixed != text and ("Ã" not in fixed and "Â" not in fixed):
+        return fixed
+    return text
+
+
 def _as_str(value: Any) -> Optional[str]:
     if value is None:
         return None
     text = str(value).strip()
-    return text or None
+    if not text:
+        return None
+    return _fix_mojibake(text)
 
 
 def _iso_from_feature(
