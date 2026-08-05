@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "apps.files",
     "apps.vendors",
     "apps.misc",
+    "apps.geos",
 ]
 
 AUTH_USER_MODEL = "users.User"
