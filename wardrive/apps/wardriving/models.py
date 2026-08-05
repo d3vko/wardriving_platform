@@ -32,6 +32,25 @@ class Wardriving(WardriveBaseModel):
         blank=True,
         verbose_name="Location (WGS84)",
     )
+    city = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="City (denormalized)",
+    )
+    country = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        verbose_name="Country (denormalized)",
+    )
+    country_iso = models.CharField(
+        max_length=2,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Country ISO (denormalized)",
+    )
     altitude_meters = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -66,6 +85,11 @@ class Wardriving(WardriveBaseModel):
             models.Index(
                 fields=["mac_oui"],
                 name="wardriving_mac_oui_idx",
+            ),
+            models.Index(
+                fields=["country_iso", "city"],
+                name="wardriving_country_city_alv",
+                condition=Q(deleted_at__isnull=True),
             ),
         ]
 
@@ -178,6 +202,25 @@ class LTEWardriving(WardriveBaseModel):
         blank=True,
         verbose_name="Location (WGS84)",
     )
+    city = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="City (denormalized)",
+    )
+    country = models.CharField(
+        max_length=128,
+        null=True,
+        blank=True,
+        verbose_name="Country (denormalized)",
+    )
+    country_iso = models.CharField(
+        max_length=2,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Country ISO (denormalized)",
+    )
     tech = models.TextField(verbose_name="Technology", default="LTE")
 
     class Meta:
@@ -194,6 +237,11 @@ class LTEWardriving(WardriveBaseModel):
             models.Index(fields=["pci"], name="lte_pci_idx"),
             models.Index(fields=["earfcn"], name="lte_earfcn_idx"),
             models.Index(fields=["enodeb_id"], name="lte_enodeb_idx"),
+            models.Index(
+                fields=["country_iso", "city"],
+                name="lte_country_city_alv",
+                condition=Q(deleted_at__isnull=True),
+            ),
         ]
 
     def __str__(self):

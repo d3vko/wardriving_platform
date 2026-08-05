@@ -259,6 +259,28 @@ def _bulk_upsert_chunk(
         updated = len(to_update)
     t_wr1 = time.perf_counter()
 
+    # Denormalize city/country after location write (WiFi + LTE only).
+    if created or updated:
+        try:
+            from apps.wardriving.geos_labels import (
+                ALLOWED_TABLES,
+                resolve_geos_labels_for_model_keys,
+            )
+
+            if model._meta.db_table in ALLOWED_TABLES:
+                resolve_geos_labels_for_model_keys(
+                    model,
+                    key_fields,
+                    keys,
+                    base_filter=base_filter,
+                )
+        except Exception:
+            logger.exception(
+                "geos_labels resolve failed model=%s keys=%d",
+                model.__name__,
+                len(keys),
+            )
+
     ignored = max(0, len(best_by_key) - (created + updated))
 
     return created, updated, ignored, (t_sel1 - t_sel0, t_cls1 - t_cls0, t_wr1 - t_wr0)

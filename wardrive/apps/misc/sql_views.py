@@ -23,20 +23,11 @@ _WIFI_VENDOR_PG = r"""
             wardriving.current_longitude,
             wardriving.altitude_meters,
             wardriving.accuracy_meters,
-            COALESCE(NULLIF(BTRIM(city.city), ''), 'Unknown') AS city,
-            COALESCE(city.country, 'Unknown') AS country,
-            COALESCE(city.country_iso, 'ZZ') AS country_iso
+            COALESCE(NULLIF(BTRIM(wardriving.city), ''), 'Unknown') AS city,
+            COALESCE(wardriving.country, 'Unknown') AS country,
+            COALESCE(wardriving.country_iso, 'ZZ') AS country_iso
         FROM wardriving
         LEFT JOIN vendor ON vendor.prefix_oui = wardriving.mac_oui
-        LEFT JOIN LATERAL (
-            SELECT gc.city, gc.country, gc.country_iso
-            FROM geos_city gc
-            WHERE gc.deleted_at IS NULL
-                AND gc.polygon && wardriving.location
-                AND ST_Intersects(gc.polygon, wardriving.location)
-            ORDER BY gc.admin_level DESC, ST_Area(gc.polygon::geography) ASC
-            LIMIT 1
-        ) AS city ON TRUE
         WHERE
             (wardriving.current_latitude != 0 AND wardriving.current_longitude != 0)
             AND wardriving.deleted_at IS NULL
@@ -76,19 +67,10 @@ _MOBILE_PG = r"""
             lte.uploaded_by,
             lte.current_latitude,
             lte.current_longitude,
-            COALESCE(NULLIF(BTRIM(city.city), ''), 'Unknown') AS city,
-            COALESCE(city.country, 'Unknown') AS country,
-            COALESCE(city.country_iso, 'ZZ') AS country_iso
+            COALESCE(NULLIF(BTRIM(lte.city), ''), 'Unknown') AS city,
+            COALESCE(lte.country, 'Unknown') AS country,
+            COALESCE(lte.country_iso, 'ZZ') AS country_iso
         FROM lte_wardriving AS lte
-        LEFT JOIN LATERAL (
-            SELECT gc.city, gc.country, gc.country_iso
-            FROM geos_city gc
-            WHERE gc.deleted_at IS NULL
-                AND gc.polygon && lte.location
-                AND ST_Intersects(gc.polygon, lte.location)
-            ORDER BY gc.admin_level DESC, ST_Area(gc.polygon::geography) ASC
-            LIMIT 1
-        ) AS city ON TRUE
         WHERE
             (lte.current_latitude != 0 AND lte.current_longitude != 0)
             AND lte.deleted_at IS NULL
