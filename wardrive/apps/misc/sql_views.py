@@ -23,7 +23,7 @@ _WIFI_VENDOR_PG = r"""
             wardriving.current_longitude,
             wardriving.altitude_meters,
             wardriving.accuracy_meters,
-            COALESCE(city.city, 'Unknown') AS city,
+            COALESCE(NULLIF(BTRIM(city.city), ''), 'Unknown') AS city,
             COALESCE(city.country, 'Unknown') AS country,
             COALESCE(city.country_iso, 'ZZ') AS country_iso
         FROM wardriving
@@ -34,6 +34,7 @@ _WIFI_VENDOR_PG = r"""
             WHERE gc.deleted_at IS NULL
                 AND gc.polygon && wardriving.location
                 AND ST_Intersects(gc.polygon, wardriving.location)
+            ORDER BY gc.admin_level DESC, ST_Area(gc.polygon::geography) ASC
             LIMIT 1
         ) AS city ON TRUE
         WHERE
@@ -75,7 +76,7 @@ _MOBILE_PG = r"""
             lte.uploaded_by,
             lte.current_latitude,
             lte.current_longitude,
-            COALESCE(city.city, 'Unknown') AS city,
+            COALESCE(NULLIF(BTRIM(city.city), ''), 'Unknown') AS city,
             COALESCE(city.country, 'Unknown') AS country,
             COALESCE(city.country_iso, 'ZZ') AS country_iso
         FROM lte_wardriving AS lte
@@ -85,6 +86,7 @@ _MOBILE_PG = r"""
             WHERE gc.deleted_at IS NULL
                 AND gc.polygon && lte.location
                 AND ST_Intersects(gc.polygon, lte.location)
+            ORDER BY gc.admin_level DESC, ST_Area(gc.polygon::geography) ASC
             LIMIT 1
         ) AS city ON TRUE
         WHERE

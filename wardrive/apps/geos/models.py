@@ -4,19 +4,30 @@ from apps.core.models import BaseModel
 
 
 class City(BaseModel):
-    """Extensión urbana (built-up / Urban Centre), no límite administrativo municipal."""
+    """Polígono geográfico de ciudad/municipio (ADM2) o país (ADM0)."""
 
-    city = models.CharField(max_length=255, db_index=True)
+    city = models.CharField(
+        max_length=255,
+        db_index=True,
+        blank=True,
+        default="",
+        help_text="Nombre ADM2; vacío para filas ADM0 (país).",
+    )
     country = models.CharField(max_length=128, db_index=True)
     country_iso = models.CharField(
         max_length=2,
         db_index=True,
         help_text="ISO 3166-1 alpha-2 (US, MX, BR, ...)",
     )
+    admin_level = models.PositiveSmallIntegerField(
+        db_index=True,
+        default=2,
+        help_text="0 = país (ADM0), 2 = municipio/condado (ADM2).",
+    )
     polygon = models.MultiPolygonField(srid=4326)
 
     # Idempotencia del seed
-    source = models.CharField(max_length=32, default="ghs_ucdb")
+    source = models.CharField(max_length=32, default="geoboundaries")
     source_id = models.CharField(max_length=64, db_index=True)
 
     class Meta:
@@ -31,7 +42,10 @@ class City(BaseModel):
         ]
         indexes = [
             models.Index(fields=["country_iso", "city"]),
+            models.Index(fields=["admin_level", "country_iso"]),
         ]
 
     def __str__(self):
-        return f"{self.city}, {self.country} ({self.country_iso})"
+        if self.city:
+            return f"{self.city}, {self.country} ({self.country_iso})"
+        return f"{self.country} ({self.country_iso}) ADM{self.admin_level}"
