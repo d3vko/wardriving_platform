@@ -8,6 +8,8 @@ and compete using wireless data gathered from various supported devices.
 
 # 🏗️ Architecture
 
+Orchestration client: **`podman-compose`** (Compose Spec file may still be named `docker-compose.yml`).
+
 ```mermaid
 flowchart TB
   subgraph Sources["Data Sources"]
@@ -21,18 +23,23 @@ flowchart TB
   end
 
   subgraph Edge["Edge"]
-    Nginx["nginx :8000"]
+    Nginx["nginx :8000\nwardrive_proxy"]
   end
 
   subgraph Applications["Applications"]
     Wardrive["Django Wardrive API\n/wardriving/"]
     Frontend["wardrive-frontend SPA\n/ctf/"]
-    Metabase["Metabase BI\n/"]
-    Analytics["Analytics / Latitude\n/analytics/"]
+    Metabase["Metabase BI\nwardrive_bi /"]
+    Analytics["Latitude analytics\n/analytics/"]
   end
 
-  subgraph Storage["Data & Storage"]
-    PG[("PostgreSQL")]
+  subgraph Observability["Observability"]
+    GlitchTip["GlitchTip :8001\n(not via nginx)"]
+  end
+
+  subgraph Storage["Data and Storage"]
+    PG[("PostGIS wardrive_db")]
+    GTDB[("Postgres glitchtip_db")]
     Redis[("Redis")]
     MinIO["MinIO S3"]
   end
@@ -45,6 +52,7 @@ flowchart TB
     Celery0["Celery proc_0"]
     Celery1["Celery proc_1"]
     Beat["Celery Beat"]
+    GTWorker["GlitchTip worker"]
   end
 
   AndroidWifi -->|"POST /api/v1/files-uploaded/"| Wardrive
@@ -52,10 +60,12 @@ flowchart TB
   HWDevice -->|"POST /api/v1/files-uploaded/"| Wardrive
 
   Browser --> Nginx
+  Browser --> GlitchTip
   Nginx --> Wardrive
   Nginx --> Frontend
   Nginx --> Metabase
   Nginx --> Analytics
+  Nginx --> MinIO
 
   Frontend -->|"REST / JWT"| Wardrive
 
@@ -66,6 +76,10 @@ flowchart TB
 
   Metabase --> PG
   Analytics --> PG
+  GlitchTip --> GTDB
+  GlitchTip --> Redis
+  GTWorker --> GTDB
+  GTWorker --> Redis
 
   RabbitMQ --> Celery0
   RabbitMQ --> Celery1
@@ -78,6 +92,25 @@ flowchart TB
   Celery1 --> MinIO
   Celery1 --> Redis
 ```
+
+## Platform services
+
+| Service (`podman-compose`) | Role | Typical access |
+|---|---|---|
+| `wardrive_proxy` (nginx) | Reverse proxy / TLS edge at host | `http://<host>:8000` |
+| `wardrive` | Django + DRF API, admin, file ingest | `/wardriving/` via nginx |
+| `wardrive-frontend` | React/MUI SPA (Bun/Vite build) | `/ctf/` via nginx |
+| `wardrive_bi` | Metabase BI (DB00 dashboard, SQL from `sql_bi_sources/`) | `/` Metabase UI via nginx |
+| `analytics` | Latitude self/global analytics | `/analytics/` (also bound `:3001`) |
+| `wardrive_db` | PostGIS 17 (app data + BI views) | internal |
+| `redis` | Cache / Celery / GlitchTip Valkey URL | internal |
+| `rabbitmq` | Celery broker (sharded `proc_*` queues) | internal |
+| `celery_proc_0` / `celery_proc_1` | File processing workers | internal |
+| `celery-beat` | Scheduled Celery tasks | internal |
+| `minio` | Object storage (uploads, static) | API via nginx; console `:8081` |
+| `glitchtip` + `glitchtip_worker` + `glitchtip_db` | Error tracking | `:8001` (bypasses nginx) |
+
+Canonical SQL for Metabase: [`sql_bi_sources/README.md`](sql_bi_sources/README.md). Demo screenshots: [`demos/README.md`](demos/README.md). BI restore/replica skill: `.cursor/skills/metabase-wardriving-bi/`.
 
 ------------------------------------------------------------------------
 
@@ -107,12 +140,13 @@ usage is **entirely their own responsibility**.
 
 Quick overview of the technologies used:
 
--   🧱 **Containers** (Docker, Podman)
+-   🧱 **Containers** (Podman + `podman-compose`; Compose Spec file may be `docker-compose.yml`)
 -   🐍 **Python + Django + Django REST Framework**
--   ⚙️ **Celery + Celery Beat** for parallel file processing
--   🏗️ Easy deployment with Docker Compose or Podman Compose
+-   ⚙️ **Celery + Celery Beat** for parallel file processing (RabbitMQ queues `proc_*`)
+-   📊 **Metabase** (`wardrive_bi`) + **Latitude** analytics + **GlitchTip** error tracking
+-   🗃️ **PostGIS**, **Redis**, **MinIO**
 
-**Additional documentation (English):** [`docs/PROJECT_SCAN_WARDRIVE.md`](docs/PROJECT_SCAN_WARDRIVE.md), [`docs/METABASE_PROXY_FIX.md`](docs/METABASE_PROXY_FIX.md), [`docs/BUGS_AND_BAD_PRACTICES.md`](docs/BUGS_AND_BAD_PRACTICES.md), [`docs/STATIC_MEDIA_MINIO_PLAN.md`](docs/STATIC_MEDIA_MINIO_PLAN.md), [`PROMPT_ANALYTICS.md`](PROMPT_ANALYTICS.md).
+**Additional documentation:** [`demos/README.md`](demos/README.md), [`sql_bi_sources/README.md`](sql_bi_sources/README.md), [`docs/PROJECT_SCAN_WARDRIVE.md`](docs/PROJECT_SCAN_WARDRIVE.md), [`docs/METABASE_PROXY_FIX.md`](docs/METABASE_PROXY_FIX.md), [`docs/BUGS_AND_BAD_PRACTICES.md`](docs/BUGS_AND_BAD_PRACTICES.md), [`docs/STATIC_MEDIA_MINIO_PLAN.md`](docs/STATIC_MEDIA_MINIO_PLAN.md), [`docs/ops/postgis_migration.md`](docs/ops/postgis_migration.md), [`PROMPT_ANALYTICS.md`](PROMPT_ANALYTICS.md).
 
 ------------------------------------------------------------------------
 
@@ -178,21 +212,52 @@ All WiGLE-style CSV paths above are directly compatible with the processing syst
 
 # 📊 BI / Dashboard Preview
 
-![map](https://raw.githubusercontent.com/AdrianPardo99/wardriving_for_self/refs/heads/main/demos/map.png)
+Catalog of all demo assets: [`demos/README.md`](demos/README.md).  
+SQL sources: [`sql_bi_sources/wardriving_normal/`](sql_bi_sources/wardriving_normal/) (WiFi/BLE) and [`sql_bi_sources/wardriving_movil/`](sql_bi_sources/wardriving_movil/) (LTE).
 
-**SQL File:** D00
+## DB00 — WIFI/BLE
+
+![DB00 WiFi map and table](demos/db00-wifi-map-and-table.png)
+
+**SQL:** D00 map, D01 detail table — view `wardriving_vendor`
 
 ------------------------------------------------------------------------
 
-![table](https://raw.githubusercontent.com/AdrianPardo99/wardriving_for_self/refs/heads/main/demos/table_and_more_analysis.png)
+![DB00 WiFi channel device signal](demos/db00-wifi-charts-channel-device-signal.png)
 
-**SQL Files:** D01, D02, D03
+**SQL:** D07 channel, D03 device, D05 signal strength
 
 ------------------------------------------------------------------------
 
-![analysis](https://raw.githubusercontent.com/AdrianPardo99/wardriving_for_self/refs/heads/main/demos/analysis_per_participant.png)
+![DB00 WiFi auth vendor geo](demos/db00-wifi-charts-auth-vendor.png)
 
-**SQL Files:** D04, D05
+**SQL:** D02 auth type, D06 vendor, D08 geo
+
+------------------------------------------------------------------------
+
+![DB00 WiFi geo and author](demos/db00-wifi-geo-and-author.png)
+
+**SQL:** D08 geo, D04 author
+
+## DB00 — LTE
+
+![DB00 LTE map](demos/db00-lte-map.png)
+
+**SQL:** D00 map — view `wardriving_mobile` (Band / provider / tech / cell type filters)
+
+------------------------------------------------------------------------
+
+![DB00 LTE map and table](demos/db00-lte-map-and-table.png)
+
+**SQL:** D00 map, D01 detail table
+
+## Legacy stills (kept)
+
+![map](demos/map.png)
+
+![table](demos/table_and_more_analysis.png)
+
+![analysis](demos/analysis_per_participant.png)
 
 ------------------------------------------------------------------------
 
@@ -303,7 +368,7 @@ You do not need separate uploads per format: **`process_format_flipper_marauder_
 
 ### Celery queues and large log processing
 
-- **`CELERY_SHARDS`** (default `2` in code; set in `.env`) defines how many RabbitMQ queues exist (`proc_0` … `proc_{N-1}`). **Run at least one worker per queue** you define: e.g. `docker-compose.yml` ships `celery_proc_0` and `celery_proc_1` listening on `proc_0` and `proc_1`, so keep `CELERY_SHARDS=2` unless you add more worker services.
+- **`CELERY_SHARDS`** (default `2` in code; set in `.env`) defines how many RabbitMQ queues exist (`proc_0` … `proc_{N-1}`). **Run at least one worker per queue** you define: e.g. `podman-compose` / `docker-compose.yml` ships `celery_proc_0` and `celery_proc_1` listening on `proc_0` and `proc_1`, so keep `CELERY_SHARDS=2` unless you add more worker services.
 - File ingestion runs in `apps.files.tasks.process_file`. Large Marauder logs spend time in **line parsing** and **bulk upsert** to PostgreSQL. At **INFO**, logs include `marauder_core parse=…` and `bulk_upsert_by_keys` timings (dedupe, select, classify, write) to compare bottlenecks. Upserts use **row-`IN`** lookups on PostgreSQL and a **partial index** (`wardriving_up_mac_ch_alv` on `uploaded_by`, `mac`, `channel` for non-deleted rows); writes are split into **transactions of up to 5000 keys** by default to shorten lock duration.
 
 ------------------------------------------------------------------------
@@ -357,13 +422,15 @@ Both endpoints:
 
 # 📈 Metabase Setup
 
-There is no automatic setup yet.
-You must configure it manually:
+There is no fully automatic provisioner yet. Manual steps:
 
-1.  Go to: `$BASE_METABASE_URL/admin/databases`
-2.  Enter the connection values from your `.env`
-3.  Create a SQL Query: `+ New > SQL`
-4.  Use or customize the queries from: `sql_bi_sources/`
+1. Open Metabase via nginx (or the `wardrive_bi` service) and go to **Admin → Databases**.
+2. Point Metabase at `wardrive_db` (same PostGIS used by Django) using values from `.env`, then **Sync schema**.
+3. Confirm views `wardriving_vendor` and `wardriving_mobile` (from Django `apps.misc` view migrations).
+4. Create or update native questions from [`sql_bi_sources/`](sql_bi_sources/) — keep `{{template-tags}}` as **field filters** (`type: dimension`). Do **not** rewrite cards with tools that collapse tags to plain text (see [`sql_bi_sources/README.md`](sql_bi_sources/README.md)).
+5. Dashboard **DB00 - Wardriving**: tabs **WIFI/BLE** and **LTE**, multi-search dashboard filters, mappings to template-tag names.
+
+For a fresh host, follow the Cursor skill **`metabase-wardriving-bi`** (project: `.cursor/skills/metabase-wardriving-bi/`).
 
 ------------------------------------------------------------------------
 
@@ -388,24 +455,23 @@ This prevents any new files from being processed.
 
 # 🙏 Special Thanks
 
--   [Tyr/@Infrn0](https://www.instagram.com/r3pt1li0)
+-   [Pwnterrey](https://www.instagram.com/pwnterrey/)
+-   [Unknown Security Conference](https://www.instagram.com/unknowncon.pe/)
+-   [Pwn3d](https://www.instagram.com/pwn3dcon/)
 -   [Harumy/backdoorbabyyy\_](https://github.com/babyyyBugs)
+-   [Tyr/@Infrn0](https://www.instagram.com/r3pt1li0)
+-   [Wero](https://github.com/wero1414)
 -   [Electronic Cats](https://www.instagram.com/electroniccats/)
--   [Ekoparty (Ekogroup Mx)](https://www.instagram.com/ekogroup_mx/)
--   [misskernel](https://www.instagram.com/misskernel/)
--   [Dr0xharakiri](https://github.com/Dr0xharakiri)
 -   [RF Village MX](https://www.instagram.com/rf_village_mx/)
--   And the Mexican Cybersecurity Community 🖤
+-   And Latam Cybersecurity Community 🖤
 
 ------------------------------------------------------------------------
 
 # 📌 TODO
 
 -   🏆 Add automatic Metabase setup (scoreboard)
--   🐾 Full support for Minino
 -   🕹️ Add new conquest mechanics
--   🔐 Add auth or API key for file upload in production
--   ✏️ Rename `is_procesed` → `is_processed` (migration)
+-   Support new RF / IoT / Wireless misc technologies / Firmwares support
 
 ------------------------------------------------------------------------
 
