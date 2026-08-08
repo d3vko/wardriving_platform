@@ -65,9 +65,11 @@ For each `D0x - *.sql` file:
 
 ## Tag maps (canonical names)
 
-**WiFi** `wardriving_vendor`: `ssid`, `device_source`, `first_seen`, `bssid`→`mac`, `auth_mode`, `vendor`, `signal_streng`, `city`, `country`, `country_iso`.
+**WiFi** `wardriving_vendor`: `ssid`, `device_source`, `first_seen`, `bssid`→`mac`, `auth_mode`, `vendor`, `signal_streng`, `city`, `region`, `country`, `country_iso`.
 
-**LTE** `wardriving_mobile`: `band`, `provider`, `device_source`, `tech`, `first_seen`, `cell_type`, `signal_streng`, `city`, `country`, `country_iso`.
+**LTE** `wardriving_mobile`: `band`, `provider`, `device_source`, `tech`, `first_seen`, `cell_type`, `signal_streng`, `city`, `region`, `country`, `country_iso`.
+
+Geo hierarchy: `country`/`country_iso` = ADM0, `region` = ADM1, `city` = ADM2. See `docs/geos-adm-hierarchy.md`.
 
 Host-specific field ids change after sync — rediscover by `(table.name, field.name)`. See optional `reference.md` for one host snapshot.
 

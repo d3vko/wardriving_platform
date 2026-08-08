@@ -27,6 +27,7 @@ class WardrivingVendorView(DBView):
     device_source = models.CharField()
     uploaded_by = models.TextField()
     city = models.CharField()
+    region = models.CharField()
     country = models.CharField()
     country_iso = models.CharField()
     # SQL Definition
@@ -65,6 +66,7 @@ class WardrivingMobileView(DBView):
     current_latitude = models.DecimalField(max_digits=13, decimal_places=7)
     current_longitude = models.DecimalField(max_digits=13, decimal_places=7)
     city = models.CharField()
+    region = models.CharField()
     country = models.CharField()
     country_iso = models.CharField()
     # SQL Definition

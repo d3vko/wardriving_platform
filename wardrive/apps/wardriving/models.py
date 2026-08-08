@@ -38,6 +38,12 @@ class Wardriving(WardriveBaseModel):
         blank=True,
         verbose_name="City (denormalized)",
     )
+    region = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Region / ADM1 (denormalized)",
+    )
     country = models.CharField(
         max_length=128,
         null=True,
@@ -89,6 +95,11 @@ class Wardriving(WardriveBaseModel):
             models.Index(
                 fields=["country_iso", "city"],
                 name="wardriving_country_city_alv",
+                condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["country_iso", "region", "city"],
+                name="wardriving_geo_region_alv",
                 condition=Q(deleted_at__isnull=True),
             ),
         ]
@@ -208,6 +219,12 @@ class LTEWardriving(WardriveBaseModel):
         blank=True,
         verbose_name="City (denormalized)",
     )
+    region = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Region / ADM1 (denormalized)",
+    )
     country = models.CharField(
         max_length=128,
         null=True,
@@ -240,6 +257,11 @@ class LTEWardriving(WardriveBaseModel):
             models.Index(
                 fields=["country_iso", "city"],
                 name="lte_country_city_alv",
+                condition=Q(deleted_at__isnull=True),
+            ),
+            models.Index(
+                fields=["country_iso", "region", "city"],
+                name="lte_geo_region_alv",
                 condition=Q(deleted_at__isnull=True),
             ),
         ]

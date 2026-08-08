@@ -1,5 +1,5 @@
 """
-Backfill denormalized city/country/country_iso from geos_city.
+Backfill denormalized city/region/country/country_iso from geos_city.
 
 Uso:
   python manage.py backfill_geos_labels --table all
@@ -21,7 +21,7 @@ from apps.wardriving.geos_labels import (
 
 class Command(BaseCommand):
     help = (
-        "Rellena city/country/country_iso en wardriving y/o lte_wardriving "
+        "Rellena city/region/country/country_iso en wardriving y/o lte_wardriving "
         "desde geos_city (set-based, reanudable)."
     )
 
@@ -121,7 +121,7 @@ class Command(BaseCommand):
         if not checks:
             self.stdout.write(
                 "Verificación sugerida:\n"
-                "  SELECT city, country, country_iso FROM wardriving_vendor "
+                "  SELECT city, region, country, country_iso FROM wardriving_vendor "
                 "WHERE id = 779912;\n"
                 "  EXPLAIN ANALYZE SELECT id FROM wardriving_vendor "
                 "WHERE country_iso = 'US' LIMIT 50;\n"
@@ -133,7 +133,8 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             for view, pk in checks:
                 cursor.execute(
-                    f"SELECT city, country, country_iso FROM {view} WHERE id = %s",
+                    f"SELECT city, region, country, country_iso "
+                    f"FROM {view} WHERE id = %s",
                     [pk],
                 )
                 row = cursor.fetchone()
@@ -145,6 +146,7 @@ class Command(BaseCommand):
                     self.stdout.write(
                         self.style.SUCCESS(
                             f"{view} id={pk}: city={row[0]!r} "
-                            f"country={row[1]!r} country_iso={row[2]!r}"
+                            f"region={row[1]!r} country={row[2]!r} "
+                            f"country_iso={row[3]!r}"
                         )
                     )

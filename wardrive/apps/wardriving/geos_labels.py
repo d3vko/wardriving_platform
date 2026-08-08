@@ -1,7 +1,8 @@
 """
-Resolución set-based de city/country/country_iso desde geos_city.
+Resolución set-based de city/region/country/country_iso desde geos_city.
 
-Preferencia: ADM2 > ADM0. Sin ST_Area(::geography).
+Multi-nivel: city←ADM2, region←ADM1, country/iso←ADM0 (fallback cualquier nivel).
+Sin ST_Area(::geography).
 NULL en columnas = sin match / no resuelto.
 """
 
@@ -29,9 +30,9 @@ def resolve_geos_labels_for_ids(
     force: bool = False,
 ) -> int:
     """
-    Actualiza city/country/country_iso para los ids dados vía JOIN espacial.
+    Actualiza city/region/country/country_iso para los ids dados vía JOIN espacial.
 
-    Si ``force`` y un id no tiene match, deja las tres columnas en NULL.
+    Si ``force`` y un id no tiene match, deja las columnas en NULL.
     Devuelve el número de filas afectadas por el UPDATE de assignación.
     """
     table = _validate_table(table)
@@ -44,7 +45,11 @@ def resolve_geos_labels_for_ids(
             cursor.execute(
                 f"""
                 UPDATE {table}
-                SET city = NULL, country = NULL, country_iso = NULL
+                SET
+                    city = NULL,
+                    region = NULL,
+                    country = NULL,
+                    country_iso = NULL
                 WHERE id = ANY(%s)
                   AND deleted_at IS NULL
                 """,
@@ -56,30 +61,63 @@ def resolve_geos_labels_for_ids(
             UPDATE {table} AS t
             SET
                 city = CASE
-                    WHEN s.admin_level = 0 THEN NULL
-                    ELSE NULLIF(BTRIM(s.city), '')
+                    WHEN s.city IS NULL OR BTRIM(s.city) = '' THEN NULL
+                    ELSE BTRIM(s.city)
+                END,
+                region = CASE
+                    WHEN s.region IS NULL OR BTRIM(s.region) = '' THEN NULL
+                    ELSE BTRIM(s.region)
                 END,
                 country = s.country,
                 country_iso = s.country_iso
             FROM (
-                SELECT DISTINCT ON (t2.id)
+                SELECT
                     t2.id AS id,
-                    gc.city AS city,
-                    gc.country AS country,
-                    gc.country_iso AS country_iso,
-                    gc.admin_level AS admin_level
+                    adm2.city AS city,
+                    adm1.region AS region,
+                    COALESCE(
+                        adm0.country, adm2.country, adm1.country
+                    ) AS country,
+                    COALESCE(
+                        adm0.country_iso, adm2.country_iso, adm1.country_iso
+                    ) AS country_iso
                 FROM {table} AS t2
-                INNER JOIN geos_city AS gc
-                    ON gc.deleted_at IS NULL
-                    AND gc.polygon && t2.location
-                    AND ST_Intersects(gc.polygon, t2.location)
+                LEFT JOIN LATERAL (
+                    SELECT gc.city, gc.country, gc.country_iso
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 2
+                      AND gc.polygon && t2.location
+                      AND ST_Intersects(gc.polygon, t2.location)
+                    ORDER BY ST_Area(gc.polygon) ASC
+                    LIMIT 1
+                ) AS adm2 ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT gc.region, gc.country, gc.country_iso
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 1
+                      AND gc.polygon && t2.location
+                      AND ST_Intersects(gc.polygon, t2.location)
+                    ORDER BY ST_Area(gc.polygon) ASC
+                    LIMIT 1
+                ) AS adm1 ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT gc.country, gc.country_iso
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 0
+                      AND gc.polygon && t2.location
+                      AND ST_Intersects(gc.polygon, t2.location)
+                    ORDER BY ST_Area(gc.polygon) ASC
+                    LIMIT 1
+                ) AS adm0 ON TRUE
                 WHERE t2.id = ANY(%s)
-                    AND t2.deleted_at IS NULL
-                    AND t2.location IS NOT NULL
-                ORDER BY
-                    t2.id,
-                    gc.admin_level DESC,
-                    ST_Area(gc.polygon) ASC
+                  AND t2.deleted_at IS NULL
+                  AND t2.location IS NOT NULL
+                  AND COALESCE(
+                      adm0.country_iso, adm2.country_iso, adm1.country_iso
+                  ) IS NOT NULL
             ) AS s
             WHERE t.id = s.id
             """,

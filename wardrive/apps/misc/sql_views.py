@@ -24,6 +24,7 @@ _WIFI_VENDOR_PG = r"""
             wardriving.altitude_meters,
             wardriving.accuracy_meters,
             COALESCE(NULLIF(BTRIM(wardriving.city), ''), 'Unknown') AS city,
+            COALESCE(NULLIF(BTRIM(wardriving.region), ''), 'Unknown') AS region,
             COALESCE(wardriving.country, 'Unknown') AS country,
             COALESCE(wardriving.country_iso, 'ZZ') AS country_iso
         FROM wardriving
@@ -68,6 +69,7 @@ _MOBILE_PG = r"""
             lte.current_latitude,
             lte.current_longitude,
             COALESCE(NULLIF(BTRIM(lte.city), ''), 'Unknown') AS city,
+            COALESCE(NULLIF(BTRIM(lte.region), ''), 'Unknown') AS region,
             COALESCE(lte.country, 'Unknown') AS country,
             COALESCE(lte.country_iso, 'ZZ') AS country_iso
         FROM lte_wardriving AS lte

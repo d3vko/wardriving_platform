@@ -49,7 +49,7 @@ Placeholders in `WHERE` must stay **Metabase field filters** (`type: dimension`)
 | `auth_mode` | auth_mode | `string/=` |
 | `vendor` | vendor | `string/=` |
 | `signal_streng` | signal_streng | `string/=` |
-| `city` / `country` / `country_iso` | same | `string/=` |
+| `city` / `region` / `country` / `country_iso` | same | `string/=` |
 
 ### LTE (`wardriving_mobile`)
 
@@ -62,14 +62,14 @@ Placeholders in `WHERE` must stay **Metabase field filters** (`type: dimension`)
 | `first_seen` | first_seen | `date/all-options` |
 | `cell_type` | cell_type | `string/=` |
 | `signal_streng` | signal_streng | `string/=` |
-| `city` / `country` / `country_iso` | same | `string/=` |
+| `city` / `region` / `country` / `country_iso` | same | `string/=` |
 
 Do **not** rename the DB column `signal_streng`.
 
 ## Dashboard DB00
 
 - Tabs: **WIFI/BLE**, **LTE**
-- Shared filters: First Seen, City, Country, Country ISO, Signal Strength
+- Shared filters: First Seen, City, Region (ADM1), Country, Country ISO, Signal Strength
 - WiFi-only: SSID, Device Source, BSSID/MAC, Auth Mode, Vendor
 - LTE-only: Band, Mobile Provider, Mobile Device Source, Mobile Tech, Cell Type
 
@@ -79,9 +79,12 @@ Dashboard `parameter_mappings` target `["dimension", ["template-tag", "<name>"]]
 
 - Do **not** rewrite these cards with MCP `construct_native_query` / `update_question` for the native SQL body — those APIs degrade field filters to `type: text` and break dashboard filters.
 - To change SQL or restore filters: keep `{{...}}` names, then set `template-tags` as `dimension` via Metabase REST/`report_card` (see project skill).
+- Geo hierarchy: `country`/`country_iso` = ADM0, `region` = ADM1 (estado/provincia), `city` = ADM2 (municipio). Do **not** map ADM1 into the `city` filter.
 
 ## Replica / fresh host
 
 Use the Cursor skill **`metabase-wardriving-bi`** (`.cursor/skills/metabase-wardriving-bi/` and personal copy under `~/.cursor/skills/`).
+
+After adding `region`: re-sync the Metabase DB schema, add a Field Filter `region` (`string/=`) on WiFi/LTE cards that already use `city`/`country`/`country_iso`, and map it on DB00 shared filters. See [`docs/geos-adm-hierarchy.md`](../docs/geos-adm-hierarchy.md).
 
 Demo screenshots of DB00: [`../demos/README.md`](../demos/README.md).

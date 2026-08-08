@@ -7,6 +7,7 @@ from apps.geos.models import City
 class CityAdmin(admin.GISModelAdmin):
     list_display = (
         "city",
+        "region",
         "country",
         "country_iso",
         "admin_level",
@@ -15,5 +16,5 @@ class CityAdmin(admin.GISModelAdmin):
         "updated_at",
     )
     list_filter = ("admin_level", "country_iso", "source", "country")
-    search_fields = ("city", "country", "country_iso", "source_id")
+    search_fields = ("city", "region", "country", "country_iso", "source_id")
     readonly_fields = ("created_at", "updated_at", "deleted_at")

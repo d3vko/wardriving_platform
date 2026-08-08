@@ -1,5 +1,5 @@
 """
-Importa límites administrativos geoBoundaries CGAZ (ADM0 + ADM2).
+Importa límites administrativos geoBoundaries CGAZ (ADM0 + ADM1 + ADM2).
 
 Fuente: geoBoundaries / William & Mary geoLab — CC BY 4.0
   https://www.geoboundaries.org/
@@ -37,6 +37,10 @@ CGAZ_URLS = {
     0: (
         "https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/CGAZ/"
         "geoBoundariesCGAZ_ADM0.gpkg"
+    ),
+    1: (
+        "https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/CGAZ/"
+        "geoBoundariesCGAZ_ADM1.gpkg"
     ),
     2: (
         "https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/CGAZ/"
@@ -161,8 +165,8 @@ def _iter_cgaz_features(
     gpkg_path: Path,
     admin_level: int,
     region_filter: str,
-) -> Iterator[tuple[str, str, str, str, int, MultiPolygon]]:
-    """Yields (source_id, city, country, country_iso, admin_level, multipolygon)."""
+) -> Iterator[tuple[str, str, str, str, str, int, MultiPolygon]]:
+    """Yields (source_id, city, region, country, country_iso, admin_level, poly)."""
     ds = DataSource(str(gpkg_path))
     if len(ds) < 1:
         raise CommandError(f"GeoPackage sin capas: {gpkg_path}")
@@ -214,17 +218,24 @@ def _iter_cgaz_features(
             raise CommandError(f"Región desconocida: {region_filter}")
 
         country = ISO2_TO_COUNTRY_NAME.get(iso2) or shape_name or iso2
+        city = ""
+        region_name = ""
         if admin_level == 0:
-            city = ""
             if shape_name:
                 country = shape_name[:128]
-        else:
+        elif admin_level == 1:
+            region_name = (shape_name or "")[:255]
+            if not region_name:
+                continue
+        elif admin_level == 2:
             city = (shape_name or "")[:255]
             if not city:
                 continue
+        else:
+            raise CommandError(f"Nivel no soportado en iterator: {admin_level}")
 
         source_id = raw_id or f"adm{admin_level}-{iso2}-{idx}"
-        # Prefijo de nivel para no colisionar IDs entre ADM0/ADM2
+        # Prefijo de nivel para no colisionar IDs entre ADM0/ADM1/ADM2
         if not raw_id:
             source_id = f"adm{admin_level}-{source_id}"
         else:
@@ -238,20 +249,21 @@ def _iter_cgaz_features(
         except Exception:
             continue
 
-        yield source_id, city, country[:128], iso2, admin_level, poly
+        yield source_id, city, region_name, country[:128], iso2, admin_level, poly
 
 
 class Command(BaseCommand):
     help = (
-        "Importa límites administrativos geoBoundaries CGAZ (ADM0 países + "
-        "ADM2 municipios) para América. CC BY 4.0 — atribución requerida."
+        "Importa límites administrativos geoBoundaries CGAZ "
+        "(ADM0 países + ADM1 estados/provincias + ADM2 municipios) "
+        "para América. CC BY 4.0 — atribución requerida."
     )
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--no-download",
             action="store_true",
-            help="No descargar; usa GPKG ya cacheados o --adm0/--adm2.",
+            help="No descargar; usa GPKG ya cacheados o --adm0/--adm1/--adm2.",
         )
         parser.add_argument(
             "--force-download",
@@ -265,6 +277,12 @@ class Command(BaseCommand):
             help="Ruta local al GPKG ADM0 (salta descarga ADM0).",
         )
         parser.add_argument(
+            "--adm1",
+            type=str,
+            default="",
+            help="Ruta local al GPKG ADM1 (salta descarga ADM1).",
+        )
+        parser.add_argument(
             "--adm2",
             type=str,
             default="",
@@ -273,8 +291,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--levels",
             type=str,
-            default="0,2",
-            help="Niveles a importar, separados por coma (default: 0,2).",
+            default="0,1,2",
+            help="Niveles a importar, separados por coma (default: 0,1,2).",
         )
         parser.add_argument(
             "--region",
@@ -297,7 +315,10 @@ class Command(BaseCommand):
             "--verify-id",
             type=int,
             default=0,
-            help="Tras importar, imprime city/country/country_iso de wardriving_vendor para ese id.",
+            help=(
+                "Tras importar, imprime city/region/country/country_iso "
+                "de wardriving_vendor para ese id."
+            ),
         )
         parser.add_argument(
             "--batch-size",
@@ -319,8 +340,8 @@ class Command(BaseCommand):
         except ValueError as exc:
             raise CommandError("--levels debe ser enteros separados por coma") from exc
         for level in levels:
-            if level not in (0, 2):
-                raise CommandError(f"Nivel no soportado: {level} (usa 0 y/o 2)")
+            if level not in (0, 1, 2):
+                raise CommandError(f"Nivel no soportado: {level} (usa 0, 1 y/o 2)")
 
         if options["replace_ghs"] and not options["dry_run"]:
             deleted, _ = City.all_objects.filter(source="ghs_ucdb").hard_delete()
@@ -380,12 +401,19 @@ class Command(BaseCommand):
         for level in levels:
             gpkg = paths[level]
             self.stdout.write(f"Leyendo ADM{level}: {gpkg}")
-            for source_id, city, country, iso2, admin_level, poly in _iter_cgaz_features(
-                gpkg, level, region
-            ):
+            for (
+                source_id,
+                city,
+                region_name,
+                country,
+                iso2,
+                admin_level,
+                poly,
+            ) in _iter_cgaz_features(gpkg, level, region):
                 seen += 1
                 defaults = {
                     "city": city,
+                    "region": region_name,
                     "country": country,
                     "country_iso": iso2,
                     "admin_level": admin_level,
@@ -393,7 +421,12 @@ class Command(BaseCommand):
                 }
                 if dry_run:
                     if seen <= 8:
-                        label = city or "(país)"
+                        if admin_level == 0:
+                            label = "(país)"
+                        elif admin_level == 1:
+                            label = region_name or "(región)"
+                        else:
+                            label = city or "(municipio)"
                         self.stdout.write(
                             f"  [dry-run] ADM{admin_level} {label}, {country} "
                             f"({iso2}) id={source_id}"
@@ -435,7 +468,7 @@ class Command(BaseCommand):
 
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT city, country, country_iso "
+                    "SELECT city, region, country, country_iso "
                     "FROM wardriving_vendor WHERE id = %s",
                     [verify_id],
                 )
@@ -450,13 +483,14 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"verify-id={verify_id}: city={row[0]!r} "
-                        f"country={row[1]!r} country_iso={row[2]!r}"
+                        f"region={row[1]!r} country={row[2]!r} "
+                        f"country_iso={row[3]!r}"
                     )
                 )
         elif not dry_run:
             self.stdout.write(
                 "Verificación sugerida:\n"
                 "  podman-compose exec -T wardrive_db psql -U postgres -c "
-                "\"SELECT city, country, country_iso "
+                "\"SELECT city, region, country, country_iso "
                 "FROM wardriving_vendor WHERE id = 779912;\""
             )
