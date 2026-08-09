@@ -1,5 +1,5 @@
 """
-Importa límites ADM1+ADM2 oficiales locales para MX / PE / AR.
+Importa límites ADM1+ADM2 oficiales locales para MX / PE / AR / CO / GT.
 
 Reemplaza (soft-delete) filas CGAZ `geoboundaries` de esos ISO en niveles 1–2.
 No toca ADM0 ni otros países.
@@ -8,6 +8,8 @@ Fuentes:
   MX — INEGI MG vía espejo CONABIO (AGEE/AGEM)
   PE — IGN/INEI límites departamentales/provinciales (.rar)
   AR — IGN vía API Georef (provincias / departamentos-comunas)
+  CO — DANE MGN vía HDX COD-AB (departamentos / municipios)
+  GT — COD-AB HDX (departamentos / municipios; origen CONRED/OCHA)
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ from apps.geos.models import City
 TARGET_SRID = 4326
 UA = "wardriving-platform/geos-local-import (+local-dev)"
 CGAZ_SOURCE = "geoboundaries"
-LOCAL_ISOS = frozenset({"MX", "PE", "AR"})
+LOCAL_ISOS = frozenset({"MX", "PE", "AR", "CO", "GT"})
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,8 @@ class PackSpec:
     url: str
     archive_name: str
     extract_subdir: str
+    # Substring required in the .shp basename when the zip has several layers.
+    shp_match: str = ""
 
 
 PACKS: dict[str, list[PackSpec]] = {
@@ -104,6 +108,54 @@ PACKS: dict[str, list[PackSpec]] = {
             "?formato=shp&campos=completo&max=600",
             "ar_departamentos.zip",
             "ar_adm2",
+        ),
+    ],
+    "CO": [
+        PackSpec(
+            "CO",
+            "dane_co",
+            1,
+            "https://data.humdata.org/dataset/50ea7fee-f9af-45a7-8a52-abb9c790a0b6/"
+            "resource/32fba556-0109-4d1c-84cb-c8abddf7775b/download/"
+            "col-administrative-divisions-shapefiles.zip",
+            "co_cod_ab.zip",
+            "co_cod",
+            "col_admbnda_adm1",
+        ),
+        PackSpec(
+            "CO",
+            "dane_co",
+            2,
+            "https://data.humdata.org/dataset/50ea7fee-f9af-45a7-8a52-abb9c790a0b6/"
+            "resource/32fba556-0109-4d1c-84cb-c8abddf7775b/download/"
+            "col-administrative-divisions-shapefiles.zip",
+            "co_cod_ab.zip",
+            "co_cod",
+            "col_admbnda_adm2",
+        ),
+    ],
+    "GT": [
+        PackSpec(
+            "GT",
+            "conred_gt",
+            1,
+            "https://data.humdata.org/dataset/0b20f310-7d22-479c-b7e2-e1bb9737fa72/"
+            "resource/56c73009-60a8-4987-88b2-bc493f8b544c/download/"
+            "gtm_admin_boundaries.shp.zip",
+            "gt_cod_ab.zip",
+            "gt_cod",
+            "gtm_admin1",
+        ),
+        PackSpec(
+            "GT",
+            "conred_gt",
+            2,
+            "https://data.humdata.org/dataset/0b20f310-7d22-479c-b7e2-e1bb9737fa72/"
+            "resource/56c73009-60a8-4987-88b2-bc493f8b544c/download/"
+            "gtm_admin_boundaries.shp.zip",
+            "gt_cod_ab.zip",
+            "gt_cod",
+            "gtm_admin2",
         ),
     ],
 }
@@ -345,10 +397,14 @@ def _extract_archive(archive: Path, dest_dir: Path) -> Path:
     raise CommandError(f"Archivo no soportado: {archive}")
 
 
-def _find_shapefile(root: Path) -> Path:
+def _find_shapefile(root: Path, match: str = "") -> Path:
     shps = sorted(root.rglob("*.shp"))
+    if match:
+        needle = match.lower()
+        shps = [p for p in shps if needle in p.name.lower()]
     if not shps:
-        raise CommandError(f"No hay .shp bajo {root}")
+        hint = f" (match={match!r})" if match else ""
+        raise CommandError(f"No hay .shp bajo {root}{hint}")
     # Prefer files with most siblings that look like main layer name
     return max(shps, key=lambda p: p.stat().st_size)
 
@@ -503,6 +559,98 @@ def _iter_ar(
             yield f"ar-adm2-{sid}", city, parent or "", poly
 
 
+def _iter_co(
+    shp_path: Path, level: int
+) -> Iterator[tuple[str, str, str, MultiPolygon]]:
+    """DANE MGN vía HDX COD-AB (ADM1_ES / ADM2_ES + PCODE)."""
+    layer, transform = _open_layer(shp_path)
+    fields = list(layer.fields)
+    if level == 1:
+        name_f = _pick_field(fields, ("ADM1_ES", "ADM1_NAME", "NAME"))
+        id_f = _pick_field(fields, ("ADM1_PCODE", "PCODE", "DPTO_CCDGO"))
+        if not name_f or not id_f:
+            raise CommandError(f"CO ADM1 campos insuficientes: {fields}")
+        for feat in layer:
+            name = _as_str(_get_attr(feat, name_f))
+            sid = _as_str(_get_attr(feat, id_f))
+            if not name or not sid:
+                continue
+            geom = feat.geom
+            if geom is None:
+                continue
+            try:
+                poly = _to_multipolygon_4326(geom, transform)
+            except Exception:
+                continue
+            yield f"co-adm1-{sid}", "", name, poly
+    else:
+        city_f = _pick_field(fields, ("ADM2_ES", "ADM2_NAME", "MPIO_CNMBRE"))
+        parent_f = _pick_field(fields, ("ADM1_ES", "ADM1_NAME", "DPTO_CNMBRE"))
+        id_f = _pick_field(fields, ("ADM2_PCODE", "MPIO_CDPMP", "PCODE"))
+        if not city_f or not id_f:
+            raise CommandError(f"CO ADM2 campos insuficientes: {fields}")
+        for feat in layer:
+            city = _as_str(_get_attr(feat, city_f))
+            sid = _as_str(_get_attr(feat, id_f))
+            parent = _as_str(_get_attr(feat, parent_f)) if parent_f else None
+            if not city or not sid:
+                continue
+            geom = feat.geom
+            if geom is None:
+                continue
+            try:
+                poly = _to_multipolygon_4326(geom, transform)
+            except Exception:
+                continue
+            yield f"co-adm2-{sid}", city, parent or "", poly
+
+
+def _iter_gt(
+    shp_path: Path, level: int
+) -> Iterator[tuple[str, str, str, MultiPolygon]]:
+    """COD-AB Guatemala (adm1_name / adm2_name + pcode)."""
+    layer, transform = _open_layer(shp_path)
+    fields = list(layer.fields)
+    if level == 1:
+        name_f = _pick_field(fields, ("adm1_name", "ADM1_ES", "ADM1_NAME", "NAME"))
+        id_f = _pick_field(fields, ("adm1_pcode", "ADM1_PCODE", "PCODE"))
+        if not name_f or not id_f:
+            raise CommandError(f"GT ADM1 campos insuficientes: {fields}")
+        for feat in layer:
+            name = _as_str(_get_attr(feat, name_f))
+            sid = _as_str(_get_attr(feat, id_f))
+            if not name or not sid:
+                continue
+            geom = feat.geom
+            if geom is None:
+                continue
+            try:
+                poly = _to_multipolygon_4326(geom, transform)
+            except Exception:
+                continue
+            yield f"gt-adm1-{sid}", "", name, poly
+    else:
+        city_f = _pick_field(fields, ("adm2_name", "ADM2_ES", "ADM2_NAME", "NAME"))
+        parent_f = _pick_field(fields, ("adm1_name", "ADM1_ES", "ADM1_NAME"))
+        id_f = _pick_field(fields, ("adm2_pcode", "ADM2_PCODE", "PCODE"))
+        if not city_f or not id_f:
+            raise CommandError(f"GT ADM2 campos insuficientes: {fields}")
+        for feat in layer:
+            city = _as_str(_get_attr(feat, city_f))
+            sid = _as_str(_get_attr(feat, id_f))
+            parent = _as_str(_get_attr(feat, parent_f)) if parent_f else None
+            if not city or not sid:
+                continue
+            geom = feat.geom
+            if geom is None:
+                continue
+            try:
+                poly = _to_multipolygon_4326(geom, transform)
+            except Exception:
+                continue
+            yield f"gt-adm2-{sid}", city, parent or "", poly
+
+
 def _iter_features(
     iso: str, level: int, shp_path: Path
 ) -> Iterator[tuple[str, str, str, MultiPolygon]]:
@@ -512,13 +660,18 @@ def _iter_features(
         yield from _iter_pe(shp_path, level)
     elif iso == "AR":
         yield from _iter_ar(shp_path, level)
+    elif iso == "CO":
+        yield from _iter_co(shp_path, level)
+    elif iso == "GT":
+        yield from _iter_gt(shp_path, level)
     else:
         raise CommandError(f"ISO no soportado: {iso}")
 
 
 class Command(BaseCommand):
     help = (
-        "Importa ADM1+ADM2 oficiales locales (MX INEGI, PE INEI/IGN, AR IGN/Georef) "
+        "Importa ADM1+ADM2 oficiales locales "
+        "(MX INEGI, PE INEI/IGN, AR IGN/Georef, CO DANE/HDX, GT COD-AB/HDX) "
         "y reemplaza CGAZ geoboundaries de esos países en niveles 1–2."
     )
 
@@ -526,8 +679,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--countries",
             type=str,
-            default="MX,PE,AR",
-            help="ISO2 separados por coma (default: MX,PE,AR).",
+            default="MX,PE,AR,CO,GT",
+            help="ISO2 separados por coma (default: MX,PE,AR,CO,GT).",
         )
         parser.add_argument(
             "--levels",
@@ -564,7 +717,9 @@ class Command(BaseCommand):
         ]
         for iso in countries:
             if iso not in LOCAL_ISOS:
-                raise CommandError(f"País no soportado: {iso} (usa MX, PE, AR)")
+                raise CommandError(
+                    f"País no soportado: {iso} (usa MX, PE, AR, CO, GT)"
+                )
         try:
             levels = sorted(
                 {int(x.strip()) for x in options["levels"].split(",") if x.strip()}
@@ -589,6 +744,10 @@ class Command(BaseCommand):
             ("PE", 2): 150,
             ("AR", 1): 20,
             ("AR", 2): 400,
+            ("CO", 1): 30,
+            ("CO", 2): 1000,
+            ("GT", 1): 20,
+            ("GT", 2): 300,
         }
 
         def flush(batch: list[tuple[str, str, dict]]) -> tuple[int, int]:
@@ -638,7 +797,7 @@ class Command(BaseCommand):
                         f"en el contenedor, o pe_*.zip en geos_cache): {exc}"
                     ) from exc
 
-                shp = _find_shapefile(extract_dir)
+                shp = _find_shapefile(extract_dir, match=pack.shp_match)
                 self.stdout.write(f"Leyendo {iso} ADM{pack.level}: {shp}")
 
                 level_seen = 0

@@ -30,8 +30,10 @@ Causa raíz: desalineación geométrica CGAZ entre niveles (no faltaba el catál
 | MX | INEGI MG (espejo CONABIO) | AGEE / estados | AGEM / municipios | `http://www.conabio.gob.mx/informacion/gis/maps/geo/dest23gw.zip`, `mun22gw.zip` | Datos INEGI; citar INEGI; no implicar endorsement |
 | PE | IGN / INEI | Departamentos | Provincias | `https://www.idep.gob.pe/descargas_CN/limites/departamentos.rar`, `provincias.rar` | ODC-By / datos abiertos; citar INEI/IGN |
 | AR | IGN vía API Georef | Provincias (+ CABA) | Departamentos / partidos / comunas | `https://apis.datos.gob.ar/georef/api/provincias?formato=shp&…`, `…/departamentos?formato=shp&…` | Datos IGN; citar IGN / Georef |
+| CO | DANE MGN vía HDX COD-AB | Departamentos (+ Bogotá D.C.) | Municipios | `co_cod_ab.zip` (HDX `cod-ab-col`) | Citar DANE / HDX COD |
+| GT | CONRED / OCHA vía HDX COD-AB | Departamentos | Municipios | `gt_cod_ab.zip` (HDX `cod-ab-gtm`) | CC BY 3.0 IGO; citar CONRED / HDX |
 
-`source` en `geos_city`: `inegi_mg`, `inei_pe`, `ign_ar`. Solo se reemplazan ADM1+ADM2 CGAZ de MX/PE/AR; ADM0 CGAZ Americas se mantiene.
+`source` en `geos_city`: `inegi_mg`, `inei_pe`, `ign_ar`, `dane_co`, `conred_gt`. Solo se reemplazan ADM1+ADM2 CGAZ de esos ISO; ADM0 CGAZ Americas se mantiene.
 
 ## Corrección aplicada en código
 

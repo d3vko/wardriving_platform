@@ -2,7 +2,7 @@
 
 Fuente base: [geoBoundaries CGAZ](https://www.geoboundaries.org/) (CC BY 4.0) para Américas.
 
-**Override local MX/PE/AR (ADM1+ADM2):** INEGI / INEI-IGN / IGN-Georef — ver [`docs/geos-region-unknown-diagnosis.md`](geos-region-unknown-diagnosis.md).
+**Override local MX/PE/AR/CO/GT (ADM1+ADM2):** INEGI / INEI-IGN / IGN-Georef / DANE COD-AB / CONRED COD-AB — ver [`docs/geos-region-unknown-diagnosis.md`](geos-region-unknown-diagnosis.md).
 
 | Nivel | Campo denormalizado | Ejemplo MX |
 |------|---------------------|------------|
@@ -39,23 +39,23 @@ podman-compose exec -T wardrive python wardrive/manage.py import_geoboundaries \
 #   ... --levels 1 --no-download
 #   ... --levels 2 --no-download --batch-size 25
 
-# 4) Override ADM1+ADM2 oficiales MX / PE / AR (corrige region Unknown)
+# 4) Override ADM1+ADM2 oficiales MX / PE / AR / CO / GT (corrige region Unknown)
 # Soft-delete CGAZ es POR PAÍS y solo DESPUÉS de import OK (no borra si falla unrar/red).
 # Contenedor: 7zip-rar (non-free) o unrar para pe_*.rar; o pe_*.zip en geos_cache.
 podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
-  --countries MX,PE,AR --levels 1,2 --replace-existing
+  --countries MX,PE,AR,CO,GT --levels 1,2 --replace-existing
 # Si PE/AR quedaron Unknown tras un replace fallido, ver
 # docs/geos-region-unknown-diagnosis.md § «Incident 2026-08-08».
 # Offline:
 #   podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
-#     --countries MX,PE,AR --replace-existing --no-download
+#     --countries MX,PE,AR,CO,GT --replace-existing --no-download
 
-# Tras import: confirmar alive counts (PE/AR no deben quedar en 0)
+# Tras import: confirmar alive counts (PE/AR/CO/GT no deben quedar en 0)
 podman-compose exec -T wardrive_db psql -U postgres -c \
   "SELECT country_iso, admin_level, source,
           COUNT(*) FILTER (WHERE deleted_at IS NULL) AS alive
    FROM geos_city
-   WHERE country_iso IN ('MX','PE','AR') AND admin_level IN (1,2)
+   WHERE country_iso IN ('MX','PE','AR','CO','GT') AND admin_level IN (1,2)
    GROUP BY 1,2,3 ORDER BY 1,2,3;"
 
 # 5) Recompute labels en capturas
@@ -66,13 +66,14 @@ podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
 podman-compose exec -T wardrive_db psql -U postgres -c \
   "SELECT country_iso, admin_level, source, COUNT(*)
    FROM geos_city WHERE deleted_at IS NULL
-     AND country_iso IN ('MX','PE','AR')
+     AND country_iso IN ('MX','PE','AR','CO','GT')
    GROUP BY 1,2,3 ORDER BY 1,2,3;"
 
 podman-compose exec -T wardrive_db psql -U postgres -c \
   "SELECT city, region, country_iso, COUNT(*)
    FROM wardriving
-   WHERE deleted_at IS NULL AND city IN ('Cozumel','Callao','Comuna 1')
+   WHERE deleted_at IS NULL
+     AND city IN ('Cozumel','Callao','Comuna 1','Medellín','Antigua Guatemala')
    GROUP BY 1,2,3 ORDER BY 1;"
 ```
 
@@ -83,6 +84,8 @@ podman-compose exec -T wardrive_db psql -U postgres -c \
 | Cozumel | Quintana Roo |
 | Callao (PE) | Callao (dept. / región) |
 | Comuna 1 | Ciudad Autónoma de Buenos Aires |
+| Medellín | Antioquia |
+| Antigua Guatemala | Sacatepéquez |
 
 Si `region` sigue vacío en BI: el filtro muestra `Unknown` por `COALESCE` en vistas — re-ejecutar backfill `--force`.
 
@@ -101,3 +104,20 @@ Tras migrar y backfill:
 - MX: INEGI Marco Geoestadístico (espejo CONABIO para descarga SHP).
 - PE: INEI / IGN límites político-administrativos.
 - AR: IGN vía servicio Georef / datos.gob.ar.
+- CO: DANE MGN vía [HDX COD-AB Colombia](https://data.humdata.org/dataset/cod-ab-col) (`dane_co`).
+- GT: COD-AB vía [HDX Guatemala](https://data.humdata.org/dataset/cod-ab-gtm) (`conred_gt`; origen CONRED/OCHA).
+
+### Regenerar caché CO/GT (offline)
+
+Si HDX cambia la URL del recurso, actualizá `PACKS` en `import_local_admin.py` o bajá a mano:
+
+```bash
+# Desde el host (queda en MEDIA_ROOT vía bind .:/code)
+curl -L -o wardrive/media/geos_cache/co_cod_ab.zip \
+  'https://data.humdata.org/dataset/50ea7fee-f9af-45a7-8a52-abb9c790a0b6/resource/32fba556-0109-4d1c-84cb-c8abddf7775b/download/col-administrative-divisions-shapefiles.zip'
+curl -L -o wardrive/media/geos_cache/gt_cod_ab.zip \
+  'https://data.humdata.org/dataset/0b20f310-7d22-479c-b7e2-e1bb9737fa72/resource/56c73009-60a8-4987-88b2-bc493f8b544c/download/gtm_admin_boundaries.shp.zip'
+
+podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
+  --countries CO,GT --levels 1,2 --replace-existing --no-download
+```
