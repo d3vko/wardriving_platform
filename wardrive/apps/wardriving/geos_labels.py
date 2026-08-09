@@ -1,8 +1,11 @@
 """
 Resolución set-based de city/region/country/country_iso desde geos_city.
 
-Multi-nivel: city←ADM2, region←ADM1 espacial, country/iso←ADM0.
-Fallback region: padre denormalizado en ADM2, luego ADM1∋centroid(ADM2).
+Multi-nivel:
+- city ← ADM3 localidad (KNN) si el país tiene admin_level=3 vivo; si no, ADM2.
+- region ← ADM1 espacial; fallback padre denormalizado (ADM2/ADM3), luego
+  ADM1∋centroid(ADM2).
+- country/iso ← ADM0.
 Sin ST_Area(::geography).
 NULL en columnas = sin match / no resuelto.
 """
@@ -74,40 +77,27 @@ def resolve_geos_labels_for_ids(
             FROM (
                 SELECT
                     t2.id AS id,
-                    adm2.city AS city,
+                    COALESCE(adm3.city, adm2.city) AS city,
                     COALESCE(
                         NULLIF(BTRIM(adm1.region), ''),
-                        NULLIF(BTRIM(adm2.parent_region), ''),
+                        NULLIF(BTRIM(COALESCE(adm3.parent_region, adm2.parent_region)), ''),
                         NULLIF(BTRIM(adm1_from_adm2.region), '')
                     ) AS region,
                     COALESCE(
                         adm0.country,
+                        adm3.country,
                         adm2.country,
                         adm1.country,
                         adm1_from_adm2.country
                     ) AS country,
                     COALESCE(
                         adm0.country_iso,
+                        adm3.country_iso,
                         adm2.country_iso,
                         adm1.country_iso,
                         adm1_from_adm2.country_iso
                     ) AS country_iso
                 FROM {table} AS t2
-                LEFT JOIN LATERAL (
-                    SELECT
-                        gc.city,
-                        gc.region AS parent_region,
-                        gc.country,
-                        gc.country_iso,
-                        gc.polygon
-                    FROM geos_city AS gc
-                    WHERE gc.deleted_at IS NULL
-                      AND gc.admin_level = 2
-                      AND gc.polygon && t2.location
-                      AND ST_Intersects(gc.polygon, t2.location)
-                    ORDER BY ST_Area(gc.polygon) ASC
-                    LIMIT 1
-                ) AS adm2 ON TRUE
                 LEFT JOIN LATERAL (
                     SELECT gc.region, gc.country, gc.country_iso
                     FROM geos_city AS gc
@@ -118,6 +108,49 @@ def resolve_geos_labels_for_ids(
                     ORDER BY ST_Area(gc.polygon) ASC
                     LIMIT 1
                 ) AS adm1 ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT gc.country, gc.country_iso
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 0
+                      AND gc.polygon && t2.location
+                      AND ST_Intersects(gc.polygon, t2.location)
+                    ORDER BY ST_Area(gc.polygon) ASC
+                    LIMIT 1
+                ) AS adm0 ON TRUE
+                -- ADM3 localidades (p. ej. AR Georef): nearest al punto.
+                LEFT JOIN LATERAL (
+                    SELECT
+                        gc.city,
+                        gc.region AS parent_region,
+                        gc.country,
+                        gc.country_iso
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 3
+                      AND gc.country_iso = COALESCE(
+                          adm1.country_iso, adm0.country_iso
+                      )
+                    ORDER BY gc.polygon <-> t2.location
+                    LIMIT 1
+                ) AS adm3 ON TRUE
+                -- ADM2 polígonos: solo cuando el país no usa ADM3.
+                LEFT JOIN LATERAL (
+                    SELECT
+                        gc.city,
+                        gc.region AS parent_region,
+                        gc.country,
+                        gc.country_iso,
+                        gc.polygon
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 2
+                      AND adm3.city IS NULL
+                      AND gc.polygon && t2.location
+                      AND ST_Intersects(gc.polygon, t2.location)
+                    ORDER BY ST_Area(gc.polygon) ASC
+                    LIMIT 1
+                ) AS adm2 ON TRUE
                 LEFT JOIN LATERAL (
                     -- Fallback: padre ADM1 vía centroide del ADM2 cuando el
                     -- punto cae en micro-gaps ADM1 (islas / costa / CABA).
@@ -141,16 +174,6 @@ def resolve_geos_labels_for_ids(
                     ORDER BY ST_Area(gc.polygon) ASC
                     LIMIT 1
                 ) AS adm1_from_adm2 ON TRUE
-                LEFT JOIN LATERAL (
-                    SELECT gc.country, gc.country_iso
-                    FROM geos_city AS gc
-                    WHERE gc.deleted_at IS NULL
-                      AND gc.admin_level = 0
-                      AND gc.polygon && t2.location
-                      AND ST_Intersects(gc.polygon, t2.location)
-                    ORDER BY ST_Area(gc.polygon) ASC
-                    LIMIT 1
-                ) AS adm0 ON TRUE
                 WHERE t2.id = ANY(%s)
                   AND t2.deleted_at IS NULL
                   AND t2.location IS NOT NULL

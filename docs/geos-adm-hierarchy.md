@@ -2,17 +2,57 @@
 
 Fuente base: [geoBoundaries CGAZ](https://www.geoboundaries.org/) (CC BY 4.0) para Américas.
 
-**Override local MX/PE/AR/CO/GT (ADM1+ADM2):** INEGI / INEI-IGN / IGN-Georef / DANE COD-AB / CONRED COD-AB — ver [`docs/geos-region-unknown-diagnosis.md`](geos-region-unknown-diagnosis.md).
+**Override local MX/PE/AR/CO/GT (ADM1+ADM2; AR también ADM3 localidades):** INEGI / INEI-IGN / IGN-Georef / DANE COD-AB / CONRED COD-AB — ver [`docs/geos-region-unknown-diagnosis.md`](geos-region-unknown-diagnosis.md).
 
 | Nivel | Campo denormalizado | Ejemplo MX |
 |------|---------------------|------------|
 | ADM0 | `country` / `country_iso` | Mexico / `MX` |
 | ADM1 | `region` | Jalisco / Quintana Roo |
-| ADM2 | `city` (+ `region` padre denormalizado en capas locales) | Guadalajara / Cozumel |
+| ADM2 | `city` (+ `region` padre denormalizado) | Guadalajara / Cozumel |
+| ADM3 | `city` = localidad (KNN; AR: barrios/localidades Georef) | Recoleta (AR) |
+
+`geos_labels`: si `country_iso` tiene filas vivas `admin_level = 3`, `city` = KNN sobre `polygon <-> location`; si no, ADM2 `ST_Intersects`.
 
 No confundir `region` (ADM1 geográfico) con `lte_wardriving.state` (estado de celda radio).
 
 ## Apply / current state
+
+### Máquina de despliegue (build externo)
+
+El operador despliega solo con:
+
+```bash
+podman-compose up --build -d
+```
+
+Eso **no** regenera `geos_city` ni labels en capturas. Tras healthy:
+
+```bash
+# Migraciones (incluye geos 0005 admin_level ADM3)
+podman-compose exec -T wardrive python wardrive/manage.py migrate
+
+# Pre-seed geos_cache en el host (bind .:/code → wardrive/media/geos_cache/):
+#   mx_dest23gw.zip mx_mun22gw.zip pe_departamentos.zip pe_provincias.zip
+#   ar_provincias.zip ar_localidades.zip co_cod_ab.zip gt_cod_ab.zip
+# Si falta algún ZIP, quita --no-download (o corre solo ese ISO) para descargar.
+
+podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
+  --countries MX,PE,AR,CO,GT --levels 1,2,3 --replace-existing --no-download
+
+podman-compose exec -T wardrive_db psql -U postgres -c \
+  "SELECT country_iso, admin_level, source,
+          COUNT(*) FILTER (WHERE deleted_at IS NULL) AS alive
+   FROM geos_city
+   WHERE country_iso IN ('MX','PE','AR','CO','GT')
+   GROUP BY 1,2,3 ORDER BY 1,2,3;"
+# AR: ADM3 georef_loc_ar ~4k; ADM2 ign_ar Comunas soft-deleted
+# MX/PE/CO/GT: ADM1+ADM2 vivos (sin ADM3 aún)
+
+podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
+  --table all --force
+```
+
+### Desarrollo local (explícito)
 
 Desde la raíz del repo (cliente Compose: **podman-compose**):
 
@@ -39,23 +79,22 @@ podman-compose exec -T wardrive python wardrive/manage.py import_geoboundaries \
 #   ... --levels 1 --no-download
 #   ... --levels 2 --no-download --batch-size 25
 
-# 4) Override ADM1+ADM2 oficiales MX / PE / AR / CO / GT (corrige region Unknown)
+# 4) Override ADM1+ADM2 (+ADM3 AR) oficiales MX / PE / AR / CO / GT
 # Soft-delete CGAZ es POR PAÍS y solo DESPUÉS de import OK (no borra si falla unrar/red).
 # Contenedor: 7zip-rar (non-free) o unrar para pe_*.rar; o pe_*.zip en geos_cache.
+# AR con levels incluyendo 3: carga localidades y retira ADM2 ign_ar (Comunas).
 podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
-  --countries MX,PE,AR,CO,GT --levels 1,2 --replace-existing
-# Si PE/AR quedaron Unknown tras un replace fallido, ver
-# docs/geos-region-unknown-diagnosis.md § «Incident 2026-08-08».
+  --countries MX,PE,AR,CO,GT --levels 1,2,3 --replace-existing
 # Offline:
 #   podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
-#     --countries MX,PE,AR,CO,GT --replace-existing --no-download
+#     --countries MX,PE,AR,CO,GT --levels 1,2,3 --replace-existing --no-download
 
 # Tras import: confirmar alive counts (PE/AR/CO/GT no deben quedar en 0)
 podman-compose exec -T wardrive_db psql -U postgres -c \
   "SELECT country_iso, admin_level, source,
           COUNT(*) FILTER (WHERE deleted_at IS NULL) AS alive
    FROM geos_city
-   WHERE country_iso IN ('MX','PE','AR','CO','GT') AND admin_level IN (1,2)
+   WHERE country_iso IN ('MX','PE','AR','CO','GT')
    GROUP BY 1,2,3 ORDER BY 1,2,3;"
 
 # 5) Recompute labels en capturas
@@ -73,7 +112,7 @@ podman-compose exec -T wardrive_db psql -U postgres -c \
   "SELECT city, region, country_iso, COUNT(*)
    FROM wardriving
    WHERE deleted_at IS NULL
-     AND city IN ('Cozumel','Callao','Comuna 1','Medellín','Antigua Guatemala')
+     AND city IN ('Cozumel','Callao','Recoleta','Medellín','Antigua Guatemala')
    GROUP BY 1,2,3 ORDER BY 1;"
 ```
 
@@ -83,7 +122,7 @@ podman-compose exec -T wardrive_db psql -U postgres -c \
 |------|-----------------|
 | Cozumel | Quintana Roo |
 | Callao (PE) | Callao (dept. / región) |
-| Comuna 1 | Ciudad Autónoma de Buenos Aires |
+| Recoleta | Ciudad Autónoma de Buenos Aires |
 | Medellín | Antioquia |
 | Antigua Guatemala | Sacatepéquez |
 
@@ -107,9 +146,17 @@ Tras migrar y backfill:
 - CO: DANE MGN vía [HDX COD-AB Colombia](https://data.humdata.org/dataset/cod-ab-col) (`dane_co`).
 - GT: COD-AB vía [HDX Guatemala](https://data.humdata.org/dataset/cod-ab-gtm) (`conred_gt`; origen CONRED/OCHA).
 
-### Regenerar caché CO/GT (offline)
+# 4) Import localidades AR (ADM3; Georef centroides buffered)
+# Sustituye city Comuna N por barrios/localidades (Recoleta, Saavedra, …).
+curl -L -o wardrive/media/geos_cache/ar_localidades.zip \
+  'https://apis.datos.gob.ar/georef/api/localidades?formato=shp&campos=completo&max=5000'
 
-Si HDX cambia la URL del recurso, actualizá `PACKS` en `import_local_admin.py` o bajá a mano:
+podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
+  --countries AR --levels 3 --replace-existing --no-download
+# AR ADM2 ign_ar (Comunas) queda soft-deleted si va bien el ADM3.
+
+# Regenerar caché CO/GT (offline) — si HDX cambia la URL, actualizar PACKS
+# en import_local_admin.py o bajar a mano:
 
 ```bash
 # Desde el host (queda en MEDIA_ROOT vía bind .:/code)

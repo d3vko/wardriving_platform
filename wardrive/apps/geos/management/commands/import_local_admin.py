@@ -1,15 +1,21 @@
 """
-Importa límites ADM1+ADM2 oficiales locales para MX / PE / AR / CO / GT.
+Importa límites ADM1+ADM2 oficiales locales para MX / PE / AR / CO / GT,
+y ADM3 localidades cuando haya fuente (AR Georef; MX/CO/PE: contrato listo).
 
 Reemplaza (soft-delete) filas CGAZ `geoboundaries` de esos ISO en niveles 1–2.
-No toca ADM0 ni otros países.
+No toca ADM0 ni otros países. AR ADM3 localidades desactiva ADM2 ign_ar
+(Comuna N) con --replace-existing.
 
 Fuentes:
   MX — INEGI MG vía espejo CONABIO (AGEE/AGEM)
   PE — IGN/INEI límites departamentales/provinciales (.rar)
-  AR — IGN vía API Georef (provincias / departamentos-comunas)
+  AR — IGN vía API Georef (provincias / departamentos-comunas / localidades)
   CO — DANE MGN vía HDX COD-AB (departamentos / municipios)
   GT — COD-AB HDX (departamentos / municipios; origen CONRED/OCHA)
+
+ADM3 (pendiente fuente): MX INEGI localidades, PE INEI centros poblados,
+CO DANE localidades/centros poblados. Mientras no haya ADM3 vivo para un ISO,
+`geos_labels` usa ADM2 Intersects; con ADM3 vivo → KNN sobre geos_city.
 """
 
 from __future__ import annotations
@@ -108,6 +114,17 @@ PACKS: dict[str, list[PackSpec]] = {
             "?formato=shp&campos=completo&max=600",
             "ar_departamentos.zip",
             "ar_adm2",
+        ),
+        # ADM3: localidades Georef (centroides). CABA: nombres de barrio.
+        PackSpec(
+            "AR",
+            "georef_loc_ar",
+            3,
+            "https://apis.datos.gob.ar/georef/api/localidades"
+            "?formato=shp&campos=completo&max=5000",
+            "ar_localidades.zip",
+            "ar_adm3",
+            "localidades",
         ),
     ],
     "CO": [
@@ -409,6 +426,29 @@ def _find_shapefile(root: Path, match: str = "") -> Path:
     return max(shps, key=lambda p: p.stat().st_size)
 
 
+def _centroid_buffer_poly(ogr_geom: Any, transform: Optional[CoordTransform]) -> MultiPolygon:
+    """Buffer pequeño alrededor de centroides (ADM3 localidades) para MultiPolygonField."""
+    geom = ogr_geom.clone()
+    if transform is not None:
+        geom.transform(transform)
+    elif geom.srid and geom.srid != TARGET_SRID:
+        geom.transform(TARGET_SRID)
+    # 2 km: separación típica de localidades; mantiene índice GIST razonable.
+    eps_deg = 0.02
+    buf = geom.buffer(eps_deg)
+    geos = buf.geos
+    if isinstance(geos, MultiPolygon):
+        return geos
+    if isinstance(geos, Polygon):
+        return MultiPolygon(geos, srid=TARGET_SRID)
+    converted = GEOSGeometry(geos.wkt, srid=TARGET_SRID)
+    if isinstance(converted, MultiPolygon):
+        return converted
+    if isinstance(converted, Polygon):
+        return MultiPolygon(converted, srid=TARGET_SRID)
+    raise ValueError(f"Buffer no convertible a MultiPolygon: {geos.geom_type}")
+
+
 def _open_layer(shp_path: Path):
     ds = DataSource(str(shp_path))
     if len(ds) < 1:
@@ -535,7 +575,8 @@ def _iter_ar(
             except Exception:
                 continue
             yield f"ar-adm1-{sid}", "", name, poly
-    else:
+    elif level == 2:
+        # Departamentos/partidos/comunas (Georef /departamentos).
         city_f = _pick_field(fields, ("nombre", "NOMBRE", "name"))
         parent_f = _pick_field(
             fields, ("prov_nombre", "PROV_NOMBRE", "nam", "NAM", "provincia")
@@ -557,6 +598,30 @@ def _iter_ar(
             except Exception:
                 continue
             yield f"ar-adm2-{sid}", city, parent or "", poly
+    else:
+        # Localidades (Georef /localidades): centroides MULTIPOINT; buffer a
+        # MultiPolygon para City.polygon. region = provincia (prov_nombr).
+        city_f = _pick_field(fields, ("nombre", "NOMBRE", "name"))
+        parent_f = _pick_field(
+            fields, ("prov_nombr", "prov_nombre", "PROV_NOMBRE", "provincia")
+        )
+        id_f = _pick_field(fields, ("id", "ID", "IN1", "in1"))
+        if not city_f or not id_f:
+            raise CommandError(f"AR ADM3 campos insuficientes: {fields}")
+        for feat in layer:
+            city = _as_str(_get_attr(feat, city_f))
+            sid = _as_str(_get_attr(feat, id_f))
+            parent = _as_str(_get_attr(feat, parent_f)) if parent_f else None
+            if not city or not sid:
+                continue
+            geom = feat.geom
+            if geom is None:
+                continue
+            try:
+                poly = _centroid_buffer_poly(geom, transform)
+            except Exception:
+                continue
+            yield f"ar-loc-{sid}", city, parent or "", poly
 
 
 def _iter_co(
@@ -672,7 +737,9 @@ class Command(BaseCommand):
     help = (
         "Importa ADM1+ADM2 oficiales locales "
         "(MX INEGI, PE INEI/IGN, AR IGN/Georef, CO DANE/HDX, GT COD-AB/HDX) "
-        "y reemplaza CGAZ geoboundaries de esos países en niveles 1–2."
+        "y ADM3 localidades cuando existan (AR Georef). "
+        "Reemplaza CGAZ geoboundaries de esos países en niveles 1–2 "
+        "y localidades ADM3 en AR."
     )
 
     def add_arguments(self, parser):
@@ -685,8 +752,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--levels",
             type=str,
-            default="1,2",
-            help="Niveles a importar (default: 1,2).",
+            default="1,2,3",
+            help="Niveles a importar (default: 1,2,3; 3 solo AR por ahora).",
         )
         parser.add_argument(
             "--no-download",
@@ -703,7 +770,8 @@ class Command(BaseCommand):
             action="store_true",
             help=(
                 "Tras importar OK un país, soft-delete CGAZ ADM1+ADM2 de ese ISO "
-                "(y huérfanos del source local). Nunca borra antes de cargar."
+                "(y huérfanos del source local). Nunca borra antes de cargar. "
+                "Con ADM3 AR: retira ADM2 ign_ar para evitar Comunas en city."
             ),
         )
         parser.add_argument("--dry-run", action="store_true")
@@ -727,8 +795,8 @@ class Command(BaseCommand):
         except ValueError as exc:
             raise CommandError("--levels inválido") from exc
         for level in levels:
-            if level not in (1, 2):
-                raise CommandError("Solo se admiten levels 1 y 2")
+            if level not in (1, 2, 3):
+                raise CommandError("Solo se admiten levels 1, 2 y 3")
 
         cache = _cache_dir()
         dry_run = options["dry_run"]
@@ -744,6 +812,7 @@ class Command(BaseCommand):
             ("PE", 2): 150,
             ("AR", 1): 20,
             ("AR", 2): 400,
+            ("AR", 3): 3500,
             ("CO", 1): 30,
             ("CO", 2): 1000,
             ("GT", 1): 20,
@@ -872,6 +941,21 @@ class Command(BaseCommand):
                         f"cgaz={n_cgaz} local_orphans={n_orph}"
                     )
                 )
+                # AR ADM3 localidades: retirar ADM2 departamentos/comunas (ign_ar)
+                # para que `city` no vuelva a Comuna N y el JOIN ADM2 no compita.
+                if iso == "AR" and 3 in levels:
+                    n_ar_adm2 = City.objects.filter(
+                        country_iso="AR",
+                        admin_level=2,
+                        source="ign_ar",
+                    ).update(deleted_at=now())
+                    if n_ar_adm2:
+                        self.stdout.write(
+                            self.style.WARNING(
+                                f"  AR ADM3 activo: soft-delete ADM2 ign_ar "
+                                f"rows={n_ar_adm2}"
+                            )
+                        )
 
         if dry_run:
             self.stdout.write(

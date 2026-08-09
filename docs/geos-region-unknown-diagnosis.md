@@ -29,17 +29,15 @@ Causa raíz: desalineación geométrica CGAZ entre niveles (no faltaba el catál
 |------|---------|------|------|------------------------------------------|------------------------|
 | MX | INEGI MG (espejo CONABIO) | AGEE / estados | AGEM / municipios | `http://www.conabio.gob.mx/informacion/gis/maps/geo/dest23gw.zip`, `mun22gw.zip` | Datos INEGI; citar INEGI; no implicar endorsement |
 | PE | IGN / INEI | Departamentos | Provincias | `https://www.idep.gob.pe/descargas_CN/limites/departamentos.rar`, `provincias.rar` | ODC-By / datos abiertos; citar INEI/IGN |
-| AR | IGN vía API Georef | Provincias (+ CABA) | Departamentos / partidos / comunas | `https://apis.datos.gob.ar/georef/api/provincias?formato=shp&…`, `…/departamentos?formato=shp&…` | Datos IGN; citar IGN / Georef |
-| CO | DANE MGN vía HDX COD-AB | Departamentos (+ Bogotá D.C.) | Municipios | `co_cod_ab.zip` (HDX `cod-ab-col`) | Citar DANE / HDX COD |
-| GT | CONRED / OCHA vía HDX COD-AB | Departamentos | Municipios | `gt_cod_ab.zip` (HDX `cod-ab-gtm`) | CC BY 3.0 IGO; citar CONRED / HDX |
+| AR | IGN vía API Georef | Provincias (+ CABA) | Localidades (ADM3) | `ar_provincias.zip`, `ar_localidades.zip` (`…/localidades?formato=shp&…`) | Datos IGN; citar IGN / Georef |
 
-`source` en `geos_city`: `inegi_mg`, `inei_pe`, `ign_ar`, `dane_co`, `conred_gt`. Solo se reemplazan ADM1+ADM2 CGAZ de esos ISO; ADM0 CGAZ Americas se mantiene.
+`source` en `geos_city`: `inegi_mg`, `inei_pe`, `ign_ar`, `georef_loc_ar` (ADM3), `dane_co`, `conred_gt`. Solo se reemplazan ADM1+ADM2 CGAZ de esos ISO; ADM0 CGAZ Americas se mantiene. AR ADM3 localidades (centroides buffered) reemplaza city Comuna/departamento en el resolver (KNN).
 
 ## Corrección aplicada en código
 
-1. `python wardrive/manage.py import_local_admin --countries MX,PE,AR --replace-existing`
-2. ADM2 guarda `region` = padre ADM1 (NOM_ENT / DEPARTAMEN / prov_nombre).
-3. `geos_labels`: `COALESCE(ADM1 espacial, padre denormalizado ADM2, ADM1∋centroid(ADM2))`.
+1. `python wardrive/manage.py import_local_admin --countries MX,PE,AR,CO,GT --levels 1,2,3 --replace-existing`
+2. ADM2 guarda `region` = padre ADM1 (NOM_ENT / DEPARTAMEN / prov_nombre). AR ADM3 localidades: `city` = barrio/localidad, padre = provincia.
+3. `geos_labels`: `region` ← ADM1 espacial (+ fallbacks). `city` ← **KNN ADM3** si el país tiene `admin_level=3` vivo; si no, ADM2 Intersects. AR con ADM3 retira ADM2 `ign_ar` (Comuna N) para no ensuciar city.
 4. `python wardrive/manage.py backfill_geos_labels --force`.
 
 Ops y spot-check: [`docs/geos-adm-hierarchy.md`](geos-adm-hierarchy.md). Siempre usar `wardrive/manage.py` (nunca `manage.py` suelto).
@@ -82,6 +80,8 @@ podman-compose up -d wardrive
 # 2) Solo PE+AR (MX ya puede estar con inegi_mg)
 podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
   --countries PE,AR --levels 1,2 --replace-existing
+# AR con ADM3 localidades (city=barrio): añade levels 3 y ar_localidades.zip
+#   import_local_admin --countries AR --levels 1,2,3 --replace-existing --no-download
 # Con ZIPs en caché: añade --no-download
 # Si falla el .rar: falta 7zip-rar (rebuild) o usa ZIP + --no-download
 
@@ -93,6 +93,7 @@ WHERE country_iso IN ('PE','AR','MX')
 GROUP BY 1,2,3 ORDER BY 1,2,3;
 "
 # Esperado: PE → inei_pe ADM1≥20 ADM2≥150 alive; AR → ign_ar ADM1≥20 ADM2≥400 alive
+# (si AR usa ADM3: ign_ar ADM2 soft-deleted, georef_loc_ar ADM3 ≥3500 alive)
 
 podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
   --table all --force

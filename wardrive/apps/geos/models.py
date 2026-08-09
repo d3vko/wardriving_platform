@@ -29,7 +29,10 @@ class City(BaseModel):
     admin_level = models.PositiveSmallIntegerField(
         db_index=True,
         default=2,
-        help_text="0 = país (ADM0), 1 = estado/provincia (ADM1), 2 = municipio (ADM2).",
+        help_text=(
+            "0 = país (ADM0), 1 = estado/provincia (ADM1), "
+            "2 = municipio (ADM2), 3 = localidad/centroide buffered."
+        ),
     )
     polygon = models.MultiPolygonField(srid=4326)
 
