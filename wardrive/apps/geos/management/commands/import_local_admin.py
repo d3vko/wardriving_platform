@@ -31,7 +31,7 @@ from typing import Any, Iterator, Optional
 import requests
 from django.conf import settings
 from django.contrib.gis.gdal import CoordTransform, DataSource, SpatialReference
-from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Point, Polygon
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils.timezone import now
@@ -427,26 +427,47 @@ def _find_shapefile(root: Path, match: str = "") -> Path:
 
 
 def _centroid_buffer_poly(ogr_geom: Any, transform: Optional[CoordTransform]) -> MultiPolygon:
-    """Buffer pequeño alrededor de centroides (ADM3 localidades) para MultiPolygonField."""
+    """Buffer pequeño alrededor de centroides (ADM3) para MultiPolygonField.
+
+    Georef ``localidades`` es MULTIPOINT; el OGRGeometry de Django no expone
+    ``.buffer()`` en MultiPoint — hay que pasar a GEOS Point primero.
+    """
     geom = ogr_geom.clone()
     if transform is not None:
         geom.transform(transform)
-    elif geom.srid and geom.srid != TARGET_SRID:
+    elif getattr(geom, "srid", None) and geom.srid != TARGET_SRID:
         geom.transform(TARGET_SRID)
-    # ~50 m en grados (aprox. a lat media); basta para GIST + KNN sin solapar de más.
+
+    geos = geom.geos
+    if geos.geom_type == "Point":
+        pt = geos
+    elif geos.geom_type == "MultiPoint":
+        if len(geos) < 1:
+            raise ValueError("MultiPoint vacío")
+        first = geos[0]
+        pt = (
+            first
+            if isinstance(first, Point)
+            else Point(first.x, first.y, srid=TARGET_SRID)
+        )
+    else:
+        pt = geos.centroid
+    if pt.srid is None:
+        pt.srid = TARGET_SRID
+
+    # ~50 m en grados (aprox. a lat media); basta para GIST + KNN.
     eps_deg = 50.0 / 111_320.0
-    buf = geom.buffer(eps_deg)
-    geos = buf.geos
-    if isinstance(geos, MultiPolygon):
-        return geos
-    if isinstance(geos, Polygon):
-        return MultiPolygon(geos, srid=TARGET_SRID)
-    converted = GEOSGeometry(geos.wkt, srid=TARGET_SRID)
+    buf = pt.buffer(eps_deg)
+    if isinstance(buf, MultiPolygon):
+        return buf
+    if isinstance(buf, Polygon):
+        return MultiPolygon(buf, srid=TARGET_SRID)
+    converted = GEOSGeometry(buf.wkt, srid=TARGET_SRID)
     if isinstance(converted, MultiPolygon):
         return converted
     if isinstance(converted, Polygon):
         return MultiPolygon(converted, srid=TARGET_SRID)
-    raise ValueError(f"Buffer no convertible a MultiPolygon: {geos.geom_type}")
+    raise ValueError(f"Buffer no convertible a MultiPolygon: {buf.geom_type}")
 
 
 def _open_layer(shp_path: Path):
@@ -600,14 +621,22 @@ def _iter_ar(
             yield f"ar-adm2-{sid}", city, parent or "", poly
     else:
         # Localidades (Georef /localidades): centroides MULTIPOINT; buffer a
-        # MultiPolygon para City.polygon. region = provincia (prov_nombr).
+        # MultiPolygon para City.polygon. region = provincia (prov_nombre).
         city_f = _pick_field(fields, ("nombre", "NOMBRE", "name"))
         parent_f = _pick_field(
-            fields, ("prov_nombr", "prov_nombre", "PROV_NOMBRE", "provincia")
+            fields,
+            (
+                "prov_nombre",
+                "prov_nombr",
+                "PROV_NOMBRE",
+                "provincia",
+            ),
         )
         id_f = _pick_field(fields, ("id", "ID", "IN1", "in1"))
         if not city_f or not id_f:
             raise CommandError(f"AR ADM3 campos insuficientes: {fields}")
+        yielded = 0
+        first_err: Optional[str] = None
         for feat in layer:
             city = _as_str(_get_attr(feat, city_f))
             sid = _as_str(_get_attr(feat, id_f))
@@ -619,9 +648,17 @@ def _iter_ar(
                 continue
             try:
                 poly = _centroid_buffer_poly(geom, transform)
-            except Exception:
+            except Exception as exc:
+                if first_err is None:
+                    first_err = f"{type(exc).__name__}: {exc}"
                 continue
+            yielded += 1
             yield f"ar-loc-{sid}", city, parent or "", poly
+        if yielded == 0:
+            raise CommandError(
+                f"AR ADM3: 0 features desde {shp_path} "
+                f"(fields={fields}; geom_err={first_err!r})"
+            )
 
 
 def _iter_co(
