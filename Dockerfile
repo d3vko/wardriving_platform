@@ -8,7 +8,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 FROM python:3.13-slim
 
 # GDAL/GEOS/PROJ requeridos por django.contrib.gis (PostGIS).
-RUN apt-get update \
+# 7zip-rar (non-free): codec RAR para pe_*.rar de IGN/INEI; p7zip-full → meta 7zip.
+RUN sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         gettext \
         netcat-traditional \
@@ -17,6 +20,7 @@ RUN apt-get update \
         libgeos-c1t64 \
         libproj25 \
         p7zip-full \
+        7zip-rar \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages

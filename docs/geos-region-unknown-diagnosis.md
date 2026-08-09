@@ -66,25 +66,22 @@ podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
 
 ### Reintento correcto del override local (después de desplegar el fix)
 
-Requisitos: código con soft-delete **post**-import; para PE usar **ZIP** en caché (recomendado) o `p7zip-full`/`unrar` en la imagen.
+Requisitos: código con soft-delete **post**-import; para PE: `7zip-rar` en la imagen
+(Dockerfile, repo non-free) o ZIP en `wardrive/media/geos_cache/`.
 
 ```bash
-# 0) Desplegar código nuevo + (opcional) rebuild si quieres 7z en imagen
+# 0) Rebuild con 7zip-rar (codec RAR)
 podman-compose build wardrive
 podman-compose up -d wardrive
 
-# 1) PE sin unrar: copia ZIPs al media del contenedor (desde el repo/host)
-#    wardrive/media/geos_cache/pe_departamentos.zip
-#    wardrive/media/geos_cache/pe_provincias.zip
-# Si el volumen MEDIA ya está montado, basta con tenerlos en el host bajo media/geos_cache.
+# 1) Alternativa sin RAR: ZIPs en wardrive/media/geos_cache/
+#    pe_departamentos.zip / pe_provincias.zip
 
 # 2) Solo PE+AR (MX ya puede estar con inegi_mg)
 podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
-  --countries PE,AR --levels 1,2 --replace-existing --no-download
-# Si no usas --no-download y no hay ZIP, el comando intentará el .rar IGN
-# y fallará sin 7z: entonces instala:
-#   podman-compose exec -u root -T wardrive bash -c \
-#     'apt-get update && apt-get install -y p7zip-full'
+  --countries PE,AR --levels 1,2 --replace-existing
+# Con ZIPs en caché: añade --no-download
+# Si falla el .rar: falta 7zip-rar (rebuild) o usa ZIP + --no-download
 
 # 3) Verificación obligatoria antes del backfill
 podman-compose exec -T wardrive_db psql -U postgres -c "

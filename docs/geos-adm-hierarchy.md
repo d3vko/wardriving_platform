@@ -41,7 +41,7 @@ podman-compose exec -T wardrive python wardrive/manage.py import_geoboundaries \
 
 # 4) Override ADM1+ADM2 oficiales MX / PE / AR (corrige region Unknown)
 # Soft-delete CGAZ es POR PAÍS y solo DESPUÉS de import OK (no borra si falla unrar/red).
-# Contenedor: necesita `7z` (p7zip-full en Dockerfile) o `unrar` para pe_*.rar.
+# Contenedor: 7zip-rar (non-free) o unrar para pe_*.rar; o pe_*.zip en geos_cache.
 podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
   --countries MX,PE,AR --levels 1,2 --replace-existing
 # Si PE/AR quedaron Unknown tras un replace fallido, ver

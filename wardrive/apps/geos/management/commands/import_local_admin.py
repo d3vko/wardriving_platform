@@ -12,6 +12,7 @@ Fuentes:
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import zipfile
@@ -216,7 +217,31 @@ def _download(url: str, dest: Path, force: bool = False) -> Path:
 
 
 def _can_extract_rar() -> bool:
-    return bool(shutil.which("unrar") or shutil.which("7z") or shutil.which("7za"))
+    """True solo si unrar existe o 7z tiene el codec RAR (paquete 7zip-rar)."""
+    if shutil.which("unrar"):
+        return True
+    seven = shutil.which("7z") or shutil.which("7za")
+    if not seven:
+        return False
+    # Debian 7zip sin 7zip-rar falla en extracción aunque el binario exista.
+    for codecs in (Path("/usr/lib/7zip/Codecs"), Path("/usr/lib/p7zip/Codecs")):
+        if codecs.is_dir() and any(codecs.glob("*[Rr]ar*")):
+            return True
+    try:
+        proc = subprocess.run(
+            [seven, "i"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    info = f"{proc.stdout or ''}\n{proc.stderr or ''}"
+    return bool(
+        re.search(r"(?i)\bRar(?:\d+)?\b", info)
+        and "Codec" in info
+    )
 
 
 def _resolve_pack_archive(
@@ -231,7 +256,7 @@ def _resolve_pack_archive(
     Resuelve el archivo a extraer.
 
     PE: archive_name es .zip (sin dependencia unrar). Si falta el ZIP:
-    descarga el .rar oficial y lo usa solo si hay unrar/7z; si no, error claro.
+    descarga el .rar oficial y lo usa solo si hay unrar/7z+RAR; si no, error claro.
     """
     preferred = cache / pack.archive_name
     url_is_rar = pack.url.rstrip("/").lower().endswith(".rar")
@@ -252,23 +277,26 @@ def _resolve_pack_archive(
             raise CommandError(
                 f"Falta {preferred}. Copia pe_departamentos.zip / pe_provincias.zip "
                 "a MEDIA_ROOT/geos_cache/ (convertidos desde los .rar IGN) "
-                "o instala p7zip-full en la imagen y quita --no-download."
+                "o instala 7zip-rar en la imagen y quita --no-download."
             )
         log(f"Descargando origen RAR: {pack.url}")
         _download(pack.url, rar_path, force=force_download)
+        # Preferir ZIP si apareció en caché (p. ej. convertido en host).
+        if preferred.is_file() and preferred.stat().st_size > 0:
+            log(f"  Usando ZIP en caché: {preferred.name}")
+            return preferred
         if _can_extract_rar():
             log(f"  RAR listo (extraíble): {rar_path.name}")
             return rar_path
-        if preferred.is_file() and preferred.stat().st_size > 0:
-            log(f"  Sin unrar/7z; usando ZIP previo: {preferred.name}")
-            return preferred
         raise CommandError(
-            "PE viene en .rar y el contenedor no tiene unrar/7z.\n"
-            "Opción A (rápida): copia pe_departamentos.zip y pe_provincias.zip "
+            "PE viene en .rar y 7z no tiene codec RAR (falta 7zip-rar) ni unrar.\n"
+            "Opción A: copia pe_departamentos.zip y pe_provincias.zip "
             "a wardrive/media/geos_cache/ y reintenta con --no-download.\n"
-            "Opción B: podman-compose exec -u root wardrive bash -c "
-            "'apt-get update && apt-get install -y p7zip-full'\n"
-            "Opción C: rebuild de imagen (Dockerfile ya incluye p7zip-full)."
+            "Opción B: rebuild (Dockerfile incluye 7zip-rar via non-free).\n"
+            "Opción C: podman-compose exec -u root wardrive bash -c "
+            "'sed -i \"s/^Components: main$/Components: main contrib non-free "
+            "non-free-firmware/\" /etc/apt/sources.list.d/debian.sources && "
+            "apt-get update && apt-get install -y 7zip-rar'"
         )
 
     if no_download:
