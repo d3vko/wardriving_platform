@@ -304,7 +304,7 @@ def _strip_column_names(df: DataFrame) -> None:
 def _rf_wifi_csv_has_core_columns(df: DataFrame) -> bool:
     """True if the DataFrame looks like a LilyGo WiFi export / English / Minino."""
     if df is None or df.empty:
-        return True
+        return False
     tmp = df.copy()
     _strip_column_names(tmp)
     mac = _first_series(tmp, "BSSID", "MAC", "mac")
@@ -329,24 +329,91 @@ def _first_series(df: DataFrame, *candidates):
     return None
 
 
+def _wifi_csv_first_line_is_wigle_metadata(file_path: str, encoding: str) -> bool:
+    """True when line 1 is WiGLE metadata (comma or tab after WigleWifi-…)."""
+    try:
+        with open(file_path, "r", encoding=encoding, newline="") as handle:
+            first = (handle.readline() or "").strip()
+    except OSError:
+        return False
+    return bool(first and (first.startswith("WigleWifi") or first.startswith("WiGL")))
+
+
+def _is_wigle_wifi_header(row: list[str]) -> bool:
+    """WiGLE / Minino / RFVillage header: MAC/SSID + Channel + RSSI (+ Type)."""
+    tokens = {str(c).strip().lower() for c in row if str(c).strip()}
+    has_mac = "mac" in tokens or "bssid" in tokens
+    has_ssid = "ssid" in tokens
+    has_channel = "channel" in tokens or "canal" in tokens
+    has_rssi = "rssi" in tokens or "señal" in tokens or "senal" in tokens
+    return has_mac and has_ssid and has_channel and has_rssi
+
+
+def _fix_wigle_wifi_row(row: list[str]) -> list[str] | None:
+    """
+    Normalize a WiGLE WiFi row to 11 fields.
+
+    Layout: MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,Lat,Lon,Alt,Acc,Type
+    Unquoted commas inside SSID produce >11 fields; merge the middle into SSID.
+    """
+    if len(row) < 11:
+        return None
+    if len(row) == 11:
+        return row
+    # MAC + SSID(parts) + 9 trailing fields (AuthMode … Type)
+    return [row[0], ",".join(row[1:-9]), *row[-9:]]
+
+
+def _fix_lilygo_wifi_row(row: list[str]) -> list[str] | None:
+    """
+    Normalize LilyGo 8-col WiFi row.
+
+    Layout: Timestamp,Lat,Long,SSID,BSSID,Canal,Señal,Seguridad
+    """
+    if len(row) < 8:
+        return None
+    if len(row) == 8:
+        return row
+    return row[:3] + [",".join(row[3:-4])] + row[-4:]
+
+
 def _read_wifi_csv_robust(file_path: str, encoding: str) -> DataFrame:
     """
-    Read LilyGo-style 8-column WiFi CSV. Uses csv.reader (quoted commas OK).
-    If a row has >8 fields, assumes unquoted commas in SSID and merges fields
-    3..-5 into SSID (Timestamp, Lat, Long, SSID, BSSID, Canal, Señal, Seguridad).
+    Read RF WiFi CSV with csv.reader (quoted commas OK; unquoted SSID commas recovered).
+
+    Supports:
+      - WiGLE 11-col (WigleWifi metadata optional): MAC,SSID,AuthMode,…
+      - LilyGo 8-col: Timestamp,Lat,Long,SSID,BSSID,Canal,Señal,Seguridad
     """
-    rows = []
+    rows: list[list[str]] = []
+    mode: str | None = None  # "wigle" | "lilygo"
     with open(file_path, "r", encoding=encoding, newline="") as handle:
         reader = csv.reader(handle)
         for row in reader:
             if not row or all(not (c or "").strip() for c in row):
                 continue
-            if len(row) == 8:
-                rows.append(row)
-            elif len(row) > 8:
-                fixed = row[:3] + [",".join(row[3:-4])] + row[-4:]
+            first = (row[0] or "").strip()
+            if first.startswith("WigleWifi") or first.startswith("WiGL"):
+                continue
+
+            if mode is None:
+                if _is_wigle_wifi_header(row):
+                    mode = "wigle"
+                    rows.append(row)
+                else:
+                    mode = "lilygo"
+                    fixed = _fix_lilygo_wifi_row(row)
+                    if fixed is not None:
+                        rows.append(fixed)
+                continue
+
+            if mode == "wigle":
+                fixed = _fix_wigle_wifi_row(row)
+            else:
+                fixed = _fix_lilygo_wifi_row(row)
+            if fixed is not None:
                 rows.append(fixed)
-            # len < 8: línea corrupta, se omite
+
     if not rows:
         return DataFrame()
     header, *data = rows
@@ -545,20 +612,37 @@ def process_file_rf(
     if device_source == SourceDevice.RF_CUSTOM_FIRMWARE_WIFI:
         for enc in ("utf-8", "latin-1"):
             try:
+                # WiGLE exports (often with unquoted commas in SSID) → robust reader first.
+                if _wifi_csv_first_line_is_wigle_metadata(file_path, enc):
+                    df = _read_wifi_csv_robust(file_path, enc)
+                    if _rf_wifi_csv_has_core_columns(df):
+                        break
+
+                skiprows = (
+                    1
+                    if _wifi_csv_first_line_is_wigle_metadata(file_path, enc)
+                    else 0
+                )
                 df = read_csv(
                     file_path,
                     encoding=enc,
                     sep=",",
                     low_memory=False,
+                    skiprows=skiprows,
+                    on_bad_lines="skip",
                 )
                 if not _rf_wifi_csv_has_core_columns(df):
+                    alt_skip = 0 if skiprows else 1
                     df = read_csv(
                         file_path,
                         encoding=enc,
                         sep=",",
                         low_memory=False,
-                        skiprows=1,
+                        skiprows=alt_skip,
+                        on_bad_lines="skip",
                     )
+                if not _rf_wifi_csv_has_core_columns(df):
+                    df = _read_wifi_csv_robust(file_path, enc)
                 break
             except UnicodeDecodeError:
                 continue
@@ -578,6 +662,11 @@ def process_file_rf(
         if df is None:
             raise ValueError(
                 "No se pudo decodificar el CSV WiFi como UTF-8 ni latin-1."
+            )
+        if not _rf_wifi_csv_has_core_columns(df):
+            raise KeyError(
+                "Columnas obligatorias no encontradas: BSSID/MAC, Canal/Channel, "
+                "Señal/RSSI/Signal. Revisa cabecera (LilyGo ES/EN o tipo de dispositivo correcto)."
             )
     else:
         try:
