@@ -70,8 +70,10 @@ PACKS: dict[str, list[PackSpec]] = {
             "PE",
             "inei_pe",
             1,
+            # Origen IGN es .rar; en despliegue preferimos ZIP preconvertido
+            # (pe_departamentos.zip) para no depender de unrar en el contenedor.
             "https://www.idep.gob.pe/descargas_CN/limites/departamentos.rar",
-            "pe_departamentos.rar",
+            "pe_departamentos.zip",
             "pe_adm1",
         ),
         PackSpec(
@@ -79,7 +81,7 @@ PACKS: dict[str, list[PackSpec]] = {
             "inei_pe",
             2,
             "https://www.idep.gob.pe/descargas_CN/limites/provincias.rar",
-            "pe_provincias.rar",
+            "pe_provincias.zip",
             "pe_adm2",
         ),
     ],
@@ -211,6 +213,75 @@ def _download(url: str, dest: Path, force: bool = False) -> Path:
                     fh.write(chunk)
     partial.replace(dest)
     return dest
+
+
+def _can_extract_rar() -> bool:
+    return bool(shutil.which("unrar") or shutil.which("7z") or shutil.which("7za"))
+
+
+def _resolve_pack_archive(
+    pack: PackSpec,
+    cache: Path,
+    *,
+    no_download: bool,
+    force_download: bool,
+    log,
+) -> Path:
+    """
+    Resuelve el archivo a extraer.
+
+    PE: archive_name es .zip (sin dependencia unrar). Si falta el ZIP:
+    descarga el .rar oficial y lo usa solo si hay unrar/7z; si no, error claro.
+    """
+    preferred = cache / pack.archive_name
+    url_is_rar = pack.url.rstrip("/").lower().endswith(".rar")
+    prefers_zip = preferred.suffix.lower() == ".zip"
+
+    if prefers_zip and url_is_rar:
+        rar_path = cache / f"{preferred.stem}.rar"
+        if (
+            preferred.is_file()
+            and preferred.stat().st_size > 0
+            and not force_download
+        ):
+            log(f"Usando ZIP en caché: {preferred.name}")
+            return preferred
+        if no_download:
+            if preferred.is_file() and preferred.stat().st_size > 0:
+                return preferred
+            raise CommandError(
+                f"Falta {preferred}. Copia pe_departamentos.zip / pe_provincias.zip "
+                "a MEDIA_ROOT/geos_cache/ (convertidos desde los .rar IGN) "
+                "o instala p7zip-full en la imagen y quita --no-download."
+            )
+        log(f"Descargando origen RAR: {pack.url}")
+        _download(pack.url, rar_path, force=force_download)
+        if _can_extract_rar():
+            log(f"  RAR listo (extraíble): {rar_path.name}")
+            return rar_path
+        if preferred.is_file() and preferred.stat().st_size > 0:
+            log(f"  Sin unrar/7z; usando ZIP previo: {preferred.name}")
+            return preferred
+        raise CommandError(
+            "PE viene en .rar y el contenedor no tiene unrar/7z.\n"
+            "Opción A (rápida): copia pe_departamentos.zip y pe_provincias.zip "
+            "a wardrive/media/geos_cache/ y reintenta con --no-download.\n"
+            "Opción B: podman-compose exec -u root wardrive bash -c "
+            "'apt-get update && apt-get install -y p7zip-full'\n"
+            "Opción C: rebuild de imagen (Dockerfile ya incluye p7zip-full)."
+        )
+
+    if no_download:
+        if not preferred.is_file():
+            raise CommandError(
+                f"Sin caché {preferred}. Quita --no-download o coloca el archivo."
+            )
+        return preferred
+
+    log(f"Descargando/usando {pack.url}")
+    _download(pack.url, preferred, force=force_download)
+    log(f"  listo {preferred.name} ({preferred.stat().st_size} bytes)")
+    return preferred
 
 
 def _extract_archive(archive: Path, dest_dir: Path) -> Path:
@@ -450,8 +521,8 @@ class Command(BaseCommand):
             "--replace-existing",
             action="store_true",
             help=(
-                "Soft-delete CGAZ ADM1+ADM2 (y locales previas del mismo source) "
-                "para los ISO seleccionados antes de cargar."
+                "Tras importar OK un país, soft-delete CGAZ ADM1+ADM2 de ese ISO "
+                "(y huérfanos del source local). Nunca borra antes de cargar."
             ),
         )
         parser.add_argument("--dry-run", action="store_true")
@@ -479,24 +550,18 @@ class Command(BaseCommand):
         cache = _cache_dir()
         dry_run = options["dry_run"]
         batch_size = max(1, int(options["batch_size"]))
-
-        if options["replace_existing"] and not dry_run:
-            qs = City.all_objects.filter(
-                country_iso__in=countries,
-                admin_level__in=levels,
-            ).filter(
-                # CGAZ a reemplazar + reimport limpio del mismo source local
-                source__in=[CGAZ_SOURCE, "inegi_mg", "inei_pe", "ign_ar"],
-            )
-            n = qs.update(deleted_at=now())
-            self.stdout.write(
-                self.style.WARNING(
-                    f"Soft-delete scoped ADM{levels} ISO={countries}: {n} filas"
-                )
-            )
+        replace = options["replace_existing"] and not dry_run
 
         created = updated = seen = 0
-        buffer: list[tuple[str, str, dict]] = []
+        # mínimos conocidos de las fuentes canónicas
+        min_expected = {
+            ("MX", 1): 30,
+            ("MX", 2): 2000,
+            ("PE", 1): 20,
+            ("PE", 2): 150,
+            ("AR", 1): 20,
+            ("AR", 2): 400,
+        }
 
         def flush(batch: list[tuple[str, str, dict]]) -> tuple[int, int]:
             c = u = 0
@@ -515,32 +580,47 @@ class Command(BaseCommand):
 
         for iso in countries:
             country_name = ISO2_TO_COUNTRY_NAME.get(iso, iso)
+            local_source = PACKS[iso][0].source
+            imported_ids: set[str] = set()
+            country_seen = 0
+            buffer: list[tuple[str, str, dict]] = []
+
+            self.stdout.write(self.style.NOTICE(f"=== {iso} ({local_source}) ==="))
+
             for pack in PACKS[iso]:
                 if pack.level not in levels:
                     continue
-                archive = cache / pack.archive_name
-                if options["no_download"]:
-                    if not archive.is_file():
-                        raise CommandError(
-                            f"Sin caché {archive}. Quita --no-download o coloca el archivo."
-                        )
-                else:
-                    self.stdout.write(f"Descargando/usando {pack.url}")
-                    _download(pack.url, archive, force=options["force_download"])
-                    self.stdout.write(
-                        f"  listo {archive.name} ({archive.stat().st_size} bytes)"
-                    )
+                archive = _resolve_pack_archive(
+                    pack,
+                    cache,
+                    no_download=options["no_download"],
+                    force_download=options["force_download"],
+                    log=self.stdout.write,
+                )
 
                 extract_dir = cache / pack.extract_subdir
                 self.stdout.write(f"Extrayendo {archive.name} → {extract_dir}")
-                _extract_archive(archive, extract_dir)
+                try:
+                    _extract_archive(archive, extract_dir)
+                except CommandError:
+                    raise
+                except subprocess.CalledProcessError as exc:
+                    raise CommandError(
+                        f"Fallo extrayendo {archive} (PE suele requerir unrar/7z "
+                        f"en el contenedor, o pe_*.zip en geos_cache): {exc}"
+                    ) from exc
+
                 shp = _find_shapefile(extract_dir)
                 self.stdout.write(f"Leyendo {iso} ADM{pack.level}: {shp}")
 
+                level_seen = 0
                 for source_id, city, region_name, poly in _iter_features(
                     iso, pack.level, shp
                 ):
                     seen += 1
+                    country_seen += 1
+                    level_seen += 1
+                    imported_ids.add(source_id)
                     defaults = {
                         "city": city[:255],
                         "region": region_name[:255],
@@ -550,7 +630,7 @@ class Command(BaseCommand):
                         "polygon": poly,
                     }
                     if dry_run:
-                        if seen <= 6:
+                        if level_seen <= 3:
                             self.stdout.write(
                                 f"  [dry-run] {iso} ADM{pack.level} "
                                 f"city={city!r} region={region_name!r} id={source_id}"
@@ -566,10 +646,45 @@ class Command(BaseCommand):
                         )
                         buffer = []
 
-        if not dry_run and buffer:
-            c, u = flush(buffer)
-            created += c
-            updated += u
+                need = min_expected.get((iso, pack.level), 1)
+                if level_seen < need:
+                    raise CommandError(
+                        f"{iso} ADM{pack.level}: solo {level_seen} features "
+                        f"(mínimo esperado {need}). Abortado sin soft-delete de {iso}."
+                    )
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  {iso} ADM{pack.level}: {level_seen} features OK"
+                    )
+                )
+
+            if not dry_run and buffer:
+                c, u = flush(buffer)
+                created += c
+                updated += u
+
+            if replace and country_seen > 0:
+                # Solo ahora: retirar CGAZ del país y huérfanos del source local
+                n_cgaz = City.objects.filter(
+                    country_iso=iso,
+                    admin_level__in=levels,
+                    source=CGAZ_SOURCE,
+                ).update(deleted_at=now())
+                n_orph = (
+                    City.objects.filter(
+                        country_iso=iso,
+                        admin_level__in=levels,
+                        source=local_source,
+                    )
+                    .exclude(source_id__in=imported_ids)
+                    .update(deleted_at=now())
+                )
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  Soft-delete post-import {iso}: "
+                        f"cgaz={n_cgaz} local_orphans={n_orph}"
+                    )
+                )
 
         if dry_run:
             self.stdout.write(
@@ -586,6 +701,6 @@ class Command(BaseCommand):
             )
             self.stdout.write(
                 "Siguiente paso:\n"
-                "  podman-compose exec -T wardrive python manage.py "
+                "  podman-compose exec -T wardrive python wardrive/manage.py "
                 "backfill_geos_labels --table all --force"
             )

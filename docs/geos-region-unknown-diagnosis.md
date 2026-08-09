@@ -35,9 +35,66 @@ Causa raíz: desalineación geométrica CGAZ entre niveles (no faltaba el catál
 
 ## Corrección aplicada en código
 
-1. `manage.py import_local_admin --countries MX,PE,AR --replace-existing`
+1. `python wardrive/manage.py import_local_admin --countries MX,PE,AR --replace-existing`
 2. ADM2 guarda `region` = padre ADM1 (NOM_ENT / DEPARTAMEN / prov_nombre).
 3. `geos_labels`: `COALESCE(ADM1 espacial, padre denormalizado ADM2, ADM1∋centroid(ADM2))`.
-4. `backfill_geos_labels --force`.
+4. `python wardrive/manage.py backfill_geos_labels --force`.
 
-Ops y spot-check: [`docs/geos-adm-hierarchy.md`](geos-adm-hierarchy.md).
+Ops y spot-check: [`docs/geos-adm-hierarchy.md`](geos-adm-hierarchy.md). Siempre usar `wardrive/manage.py` (nunca `manage.py` suelto).
+
+## Incident 2026-08-08 — PE/AR en Unknown tras replace
+
+**Causa:** `import_local_admin --replace-existing` hacía soft-delete de CGAZ para **todos** los ISO al inicio. MX (`inegi_mg`) cargó bien; PE (`.rar` sin `unrar`/`7z` en la imagen) y/o AR fallaron → `geos_city` se quedó **sin ADM1/ADM2 vivos** para PE/AR. El backfill `--force` dejó `city`/`region` NULL → UI `Unknown`. Country (ADM0 CGAZ) seguía OK.
+
+**Estado CTF observado:** `inegi_mg` vivo (MX); `inei_pe`/`ign_ar` ausentes; CGAZ ADM1+ADM2 de PE/AR con `deleted_at` set.
+
+### Recuperación inmediata en el host (restaura city vía CGAZ)
+
+```bash
+podman-compose exec -T wardrive_db psql -U postgres -c "
+UPDATE geos_city
+SET deleted_at = NULL
+WHERE country_iso IN ('PE','AR')
+  AND admin_level IN (1,2)
+  AND source = 'geoboundaries'
+  AND deleted_at IS NOT NULL;
+"
+
+podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
+  --table all --force
+```
+
+### Reintento correcto del override local (después de desplegar el fix)
+
+Requisitos: código con soft-delete **post**-import; para PE usar **ZIP** en caché (recomendado) o `p7zip-full`/`unrar` en la imagen.
+
+```bash
+# 0) Desplegar código nuevo + (opcional) rebuild si quieres 7z en imagen
+podman-compose build wardrive
+podman-compose up -d wardrive
+
+# 1) PE sin unrar: copia ZIPs al media del contenedor (desde el repo/host)
+#    wardrive/media/geos_cache/pe_departamentos.zip
+#    wardrive/media/geos_cache/pe_provincias.zip
+# Si el volumen MEDIA ya está montado, basta con tenerlos en el host bajo media/geos_cache.
+
+# 2) Solo PE+AR (MX ya puede estar con inegi_mg)
+podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
+  --countries PE,AR --levels 1,2 --replace-existing --no-download
+# Si no usas --no-download y no hay ZIP, el comando intentará el .rar IGN
+# y fallará sin 7z: entonces instala:
+#   podman-compose exec -u root -T wardrive bash -c \
+#     'apt-get update && apt-get install -y p7zip-full'
+
+# 3) Verificación obligatoria antes del backfill
+podman-compose exec -T wardrive_db psql -U postgres -c "
+SELECT country_iso, admin_level, source, COUNT(*) FILTER (WHERE deleted_at IS NULL) AS alive
+FROM geos_city
+WHERE country_iso IN ('PE','AR','MX')
+GROUP BY 1,2,3 ORDER BY 1,2,3;
+"
+# Esperado: PE → inei_pe ADM1≥20 ADM2≥150 alive; AR → ign_ar ADM1≥20 ADM2≥400 alive
+
+podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
+  --table all --force
+```

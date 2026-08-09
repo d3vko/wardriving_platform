@@ -2,8 +2,8 @@
 Backfill denormalized city/region/country/country_iso from geos_city.
 
 Uso:
-  python manage.py backfill_geos_labels --table all
-  python manage.py backfill_geos_labels --table wardriving --batch-size 5000 --force
+  python wardrive/manage.py backfill_geos_labels --table all
+  python wardrive/manage.py backfill_geos_labels --table wardriving --batch-size 5000 --force
 """
 
 from __future__ import annotations

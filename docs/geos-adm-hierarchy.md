@@ -22,16 +22,17 @@ podman-compose up -d wardrive_db redis
 podman-compose up -d wardrive
 
 # 2) Migraciones (geos region, capturas region, vistas con region)
-podman-compose exec -T wardrive python manage.py migrate geos
-podman-compose exec -T wardrive python manage.py migrate wardriving
-podman-compose exec -T wardrive python manage.py migrate misc
+# Siempre invocar Django vía wardrive/manage.py (WORKDIR del contenedor: /code).
+podman-compose exec -T wardrive python wardrive/manage.py migrate geos
+podman-compose exec -T wardrive python wardrive/manage.py migrate wardriving
+podman-compose exec -T wardrive python wardrive/manage.py migrate misc
 
 # 3) Seed ADM0+ADM1+ADM2 América (CGAZ)
 # Preferir caché local (descargas grandes pueden SIGKILL el contenedor app):
 #   curl -L -o wardrive/media/geos_cache/geoBoundariesCGAZ_ADM1.gpkg \
 #     https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/CGAZ/geoBoundariesCGAZ_ADM1.gpkg
 #   (igual para ADM0/ADM2)
-podman-compose exec -T wardrive python manage.py import_geoboundaries \
+podman-compose exec -T wardrive python wardrive/manage.py import_geoboundaries \
   --levels 0,1,2 --region americas --replace-ghs --no-download
 # Si falla por memoria, importar por nivel:
 #   ... --levels 0 --replace-ghs
@@ -39,16 +40,26 @@ podman-compose exec -T wardrive python manage.py import_geoboundaries \
 #   ... --levels 2 --no-download --batch-size 25
 
 # 4) Override ADM1+ADM2 oficiales MX / PE / AR (corrige region Unknown)
-# Requiere red o caché en wardrive/media/geos_cache/ (mx_*.zip, pe_*.rar, ar_*.zip).
-# Contenedor PE: binario `unrar` o `7z` para .rar.
-podman-compose exec -T wardrive python manage.py import_local_admin \
+# Soft-delete CGAZ es POR PAÍS y solo DESPUÉS de import OK (no borra si falla unrar/red).
+# Contenedor: necesita `7z` (p7zip-full en Dockerfile) o `unrar` para pe_*.rar.
+podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
   --countries MX,PE,AR --levels 1,2 --replace-existing
+# Si PE/AR quedaron Unknown tras un replace fallido, ver
+# docs/geos-region-unknown-diagnosis.md § «Incident 2026-08-08».
 # Offline:
-#   podman-compose exec -T wardrive python manage.py import_local_admin \
+#   podman-compose exec -T wardrive python wardrive/manage.py import_local_admin \
 #     --countries MX,PE,AR --replace-existing --no-download
 
+# Tras import: confirmar alive counts (PE/AR no deben quedar en 0)
+podman-compose exec -T wardrive_db psql -U postgres -c \
+  "SELECT country_iso, admin_level, source,
+          COUNT(*) FILTER (WHERE deleted_at IS NULL) AS alive
+   FROM geos_city
+   WHERE country_iso IN ('MX','PE','AR') AND admin_level IN (1,2)
+   GROUP BY 1,2,3 ORDER BY 1,2,3;"
+
 # 5) Recompute labels en capturas
-podman-compose exec -T wardrive python manage.py backfill_geos_labels \
+podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
   --table all --force
 
 # 6) Spot-check
