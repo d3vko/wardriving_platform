@@ -10,7 +10,7 @@ FROM python:3.13-slim
 # GDAL/GEOS/PROJ requeridos por django.contrib.gis (PostGIS).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        getext \
+        gettext \
         netcat-traditional \
         gdal-bin \
         libgdal36 \
