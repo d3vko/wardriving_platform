@@ -179,8 +179,9 @@ def resolve_geos_labels_for_ids(
                   AND t2.location IS NOT NULL
                   AND COALESCE(
                       adm0.country_iso,
-                      adm2.country_iso,
                       adm1.country_iso,
+                      adm3.country_iso,
+                      adm2.country_iso,
                       adm1_from_adm2.country_iso
                   ) IS NOT NULL
             ) AS s

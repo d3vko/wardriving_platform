@@ -433,8 +433,8 @@ def _centroid_buffer_poly(ogr_geom: Any, transform: Optional[CoordTransform]) ->
         geom.transform(transform)
     elif geom.srid and geom.srid != TARGET_SRID:
         geom.transform(TARGET_SRID)
-    # 2 km: separación típica de localidades; mantiene índice GIST razonable.
-    eps_deg = 0.02
+    # ~50 m en grados (aprox. a lat media); basta para GIST + KNN sin solapar de más.
+    eps_deg = 50.0 / 111_320.0
     buf = geom.buffer(eps_deg)
     geos = buf.geos
     if isinstance(geos, MultiPolygon):
@@ -836,16 +836,19 @@ class Command(BaseCommand):
 
         for iso in countries:
             country_name = ISO2_TO_COUNTRY_NAME.get(iso, iso)
-            local_source = PACKS[iso][0].source
+            packs_for_iso = [p for p in PACKS[iso] if p.level in levels]
+            local_sources = {p.source for p in packs_for_iso}
             imported_ids: set[str] = set()
             country_seen = 0
             buffer: list[tuple[str, str, dict]] = []
 
-            self.stdout.write(self.style.NOTICE(f"=== {iso} ({local_source}) ==="))
+            self.stdout.write(
+                self.style.NOTICE(
+                    f"=== {iso} ({', '.join(sorted(local_sources)) or 'n/a'}) ==="
+                )
+            )
 
-            for pack in PACKS[iso]:
-                if pack.level not in levels:
-                    continue
+            for pack in packs_for_iso:
                 archive = _resolve_pack_archive(
                     pack,
                     cache,
@@ -920,21 +923,26 @@ class Command(BaseCommand):
                 updated += u
 
             if replace and country_seen > 0:
-                # Solo ahora: retirar CGAZ del país y huérfanos del source local
-                n_cgaz = City.objects.filter(
-                    country_iso=iso,
-                    admin_level__in=levels,
-                    source=CGAZ_SOURCE,
-                ).update(deleted_at=now())
-                n_orph = (
-                    City.objects.filter(
+                # CGAZ solo cubre 0–2; no soft-deletear por level 3.
+                cgaz_levels = [lv for lv in levels if lv in (1, 2)]
+                n_cgaz = 0
+                if cgaz_levels:
+                    n_cgaz = City.objects.filter(
                         country_iso=iso,
-                        admin_level__in=levels,
-                        source=local_source,
+                        admin_level__in=cgaz_levels,
+                        source=CGAZ_SOURCE,
+                    ).update(deleted_at=now())
+                n_orph = 0
+                for src in local_sources:
+                    n_orph += (
+                        City.objects.filter(
+                            country_iso=iso,
+                            admin_level__in=levels,
+                            source=src,
+                        )
+                        .exclude(source_id__in=imported_ids)
+                        .update(deleted_at=now())
                     )
-                    .exclude(source_id__in=imported_ids)
-                    .update(deleted_at=now())
-                )
                 self.stdout.write(
                     self.style.WARNING(
                         f"  Soft-delete post-import {iso}: "

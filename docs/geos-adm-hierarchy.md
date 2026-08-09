@@ -19,18 +19,15 @@ No confundir `region` (ADM1 geográfico) con `lte_wardriving.state` (estado de c
 
 ### Máquina de despliegue (build externo)
 
-El operador despliega solo con:
-
 ```bash
 podman-compose up --build -d
 ```
 
+`start.sh` ya ejecuta `migrate` al arrancar (incl. geos 0005 ADM3). **No** hace falta `manage.py migrate` a mano.
+
 Eso **no** regenera `geos_city` ni labels en capturas. Tras healthy:
 
 ```bash
-# Migraciones (incluye geos 0005 admin_level ADM3)
-podman-compose exec -T wardrive python wardrive/manage.py migrate
-
 # Pre-seed geos_cache en el host (bind .:/code → wardrive/media/geos_cache/):
 #   mx_dest23gw.zip mx_mun22gw.zip pe_departamentos.zip pe_provincias.zip
 #   ar_provincias.zip ar_localidades.zip co_cod_ab.zip gt_cod_ab.zip
@@ -57,17 +54,12 @@ podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
 Desde la raíz del repo (cliente Compose: **podman-compose**):
 
 ```bash
-# 1) Stack DB + app
+# 1) Stack: migrate lo aplica start.sh al arrancar wardrive
 podman-compose up -d wardrive_db redis
 podman-compose up -d wardrive
+# (o: podman-compose up --build -d)
 
-# 2) Migraciones (geos region, capturas region, vistas con region)
-# Siempre invocar Django vía wardrive/manage.py (WORKDIR del contenedor: /code).
-podman-compose exec -T wardrive python wardrive/manage.py migrate geos
-podman-compose exec -T wardrive python wardrive/manage.py migrate wardriving
-podman-compose exec -T wardrive python wardrive/manage.py migrate misc
-
-# 3) Seed ADM0+ADM1+ADM2 América (CGAZ)
+# 2) Seed ADM0+ADM1+ADM2 América (CGAZ)
 # Preferir caché local (descargas grandes pueden SIGKILL el contenedor app):
 #   curl -L -o wardrive/media/geos_cache/geoBoundariesCGAZ_ADM1.gpkg \
 #     https://github.com/wmgeolab/geoBoundaries/raw/main/releaseData/CGAZ/geoBoundariesCGAZ_ADM1.gpkg
@@ -79,7 +71,7 @@ podman-compose exec -T wardrive python wardrive/manage.py import_geoboundaries \
 #   ... --levels 1 --no-download
 #   ... --levels 2 --no-download --batch-size 25
 
-# 4) Override ADM1+ADM2 (+ADM3 AR) oficiales MX / PE / AR / CO / GT
+# 3) Override ADM1+ADM2 (+ADM3 AR) oficiales MX / PE / AR / CO / GT
 # Soft-delete CGAZ es POR PAÍS y solo DESPUÉS de import OK (no borra si falla unrar/red).
 # Contenedor: 7zip-rar (non-free) o unrar para pe_*.rar; o pe_*.zip en geos_cache.
 # AR con levels incluyendo 3: carga localidades y retira ADM2 ign_ar (Comunas).
@@ -97,11 +89,11 @@ podman-compose exec -T wardrive_db psql -U postgres -c \
    WHERE country_iso IN ('MX','PE','AR','CO','GT')
    GROUP BY 1,2,3 ORDER BY 1,2,3;"
 
-# 5) Recompute labels en capturas
+# 4) Recompute labels en capturas
 podman-compose exec -T wardrive python wardrive/manage.py backfill_geos_labels \
   --table all --force
 
-# 6) Spot-check
+# 5) Spot-check
 podman-compose exec -T wardrive_db psql -U postgres -c \
   "SELECT country_iso, admin_level, source, COUNT(*)
    FROM geos_city WHERE deleted_at IS NULL
