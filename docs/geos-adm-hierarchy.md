@@ -120,6 +120,48 @@ podman-compose exec -T wardrive_db psql -U postgres -c \
 
 Si `region` sigue vacío en BI: el filtro muestra `Unknown` por `COALESCE` en vistas — re-ejecutar backfill `--force`.
 
+## Resolución de labels: ingest async + índices GiST parciales
+
+El cruce PostGIS (city/region/country/country_iso) **ya no se ejecuta síncrono en
+`process_file`**. Tras el `bulk_create`/`bulk_update`, `bulk_upsert_by_keys`
+registra vía `transaction.on_commit` un enqueue a la tarea Celery
+`apps.wardriving.tasks.resolve_geos_labels`, que llama a
+`resolve_geos_labels_for_ids` (UPDATE set-based con LATERAL sobre `geos_city`).
+
+Implicaciones operativas:
+
+- `process_file` vuelve a <1–2s en archivos chicos (antes ~16s con 2 filas LTE).
+- Las columnas `city`/`region`/`country` quedan `NULL` hasta que la tarea async
+  termine (segundos después). BI/Mapas usan `COALESCE(..., 'Unknown')` en vistas,
+  así que no hay regresión visual; al refrescar, los labels aparecen.
+- Si el broker Celery cae, `enqueue_geos_labels_for_model_keys` hace fallback
+  defensivo a resolve síncrono (no se pierden labels).
+- `backfill_geos_labels` sigue siendo síncrono (offline, sin broker).
+
+Optimización SQL (`geos_labels.resolve_geos_labels_for_ids`):
+
+- Short-circuit ADM3: si ningún `country_iso` tiene filas `admin_level=3` vivas,
+  se omite el lateral KNN. Si las hay, se filtra con `country_iso = ANY(%s)`
+  (set de ISOs con ADM3 vivo) para que el planner use el índice parcial
+  `(admin_level, country_iso)` + GiST en vez de un KNN global.
+
+Índices (migración `geos 0006`): GiST parciales sobre `geos_city.polygon` por
+`admin_level` vivo (`deleted_at IS NULL`): `geos_city_gist_adm{0,1,2,3}_alive`.
+Cada lateral de matching filtra exactamente por `(admin_level=N, deleted_at IS
+NULL)` + bbox `&&`, así que el planner tiene un índice espacial ya acotado.
+
+```bash
+# Tras migrar (start.sh aplica migrate al arrancar):
+podman-compose exec -T wardrive_db psql -U postgres -c "\di geos_city_gist_adm*_alive"
+# Verificar que el planner usa el GiST parcial:
+podman-compose exec -T wardrive_db psql -U postgres -c "
+  EXPLAIN (ANALYZE, BUFFERS)
+  SELECT gc.region FROM geos_city gc
+  WHERE gc.deleted_at IS NULL AND gc.admin_level=1
+    AND gc.polygon && ST_SetSRID(ST_MakePoint(-99.1, 19.4),4326)
+    AND ST_Intersects(gc.polygon, ST_SetSRID(ST_MakePoint(-99.1,19.4),4326));"
+```
+
 ## Metabase (pasos del operador)
 
 Tras migrar y backfill:

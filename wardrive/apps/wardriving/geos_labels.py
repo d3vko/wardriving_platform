@@ -8,13 +8,22 @@ Multi-nivel:
 - country/iso ← ADM0.
 Sin ST_Area(::geography).
 NULL en columnas = sin match / no resuelto.
+
+El cruce espacial se ejecuta fuera del hot path de ingest: ``enqueue_geos_labels_*``
+encola la tarea Celery ``resolve_geos_labels`` (ver ``apps.wardriving.tasks``), que a
+su vez llama a :func:`resolve_geos_labels_for_ids`. El matching sigue siendo set-based
+(UPDATE con LATERAL), pero ya no bloquea ``process_file`` ni la transacción de write.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Iterable, Optional, Sequence
 
 from django.db import connection
+from django.db.models import Q
+
+logger = logging.getLogger(__name__)
 
 TABLE_WARDRIVING = "wardriving"
 TABLE_LTE = "lte_wardriving"
@@ -59,6 +68,48 @@ def resolve_geos_labels_for_ids(
                 """,
                 [id_list],
             )
+
+        # Short-circuit ADM3: solo tiene sentido evaluar el KNN de localidades
+        # cuando existen filas admin_level=3 vivas. Pre-computamos el set de
+        # ISOs con ADM3 vivo para (a) omitir el lateral por completo si no hay
+        # ADM3 en ningún país, y (b) restringir con `country_iso = ANY(%s)` para
+        # que el planner use el índice parcial (admin_level, country_iso) +
+        # GiST en vez de un KNN global sobre todos los ADM3.
+        cursor.execute(
+            """
+            SELECT DISTINCT country_iso
+            FROM geos_city
+            WHERE deleted_at IS NULL
+              AND admin_level = 3
+              AND country_iso IS NOT NULL
+            """
+        )
+        adm3_isos = [r[0] for r in cursor.fetchall()]
+
+        adm3_lateral = ""
+        adm3_params: list = []
+        if adm3_isos:
+            adm3_lateral = """
+                -- ADM3 localidades (p. ej. AR Georef): nearest al punto.
+                -- Restringido a ISOs con ADM3 vivo para acotar el KNN.
+                LEFT JOIN LATERAL (
+                    SELECT
+                        gc.city,
+                        gc.region AS parent_region,
+                        gc.country,
+                        gc.country_iso
+                    FROM geos_city AS gc
+                    WHERE gc.deleted_at IS NULL
+                      AND gc.admin_level = 3
+                      AND gc.country_iso = COALESCE(
+                          adm1.country_iso, adm0.country_iso
+                      )
+                      AND gc.country_iso = ANY(%s)
+                    ORDER BY gc.polygon <-> t2.location
+                    LIMIT 1
+                ) AS adm3 ON TRUE
+            """
+            adm3_params = [adm3_isos]
 
         cursor.execute(
             f"""
@@ -118,22 +169,7 @@ def resolve_geos_labels_for_ids(
                     ORDER BY ST_Area(gc.polygon) ASC
                     LIMIT 1
                 ) AS adm0 ON TRUE
-                -- ADM3 localidades (p. ej. AR Georef): nearest al punto.
-                LEFT JOIN LATERAL (
-                    SELECT
-                        gc.city,
-                        gc.region AS parent_region,
-                        gc.country,
-                        gc.country_iso
-                    FROM geos_city AS gc
-                    WHERE gc.deleted_at IS NULL
-                      AND gc.admin_level = 3
-                      AND gc.country_iso = COALESCE(
-                          adm1.country_iso, adm0.country_iso
-                      )
-                    ORDER BY gc.polygon <-> t2.location
-                    LIMIT 1
-                ) AS adm3 ON TRUE
+                {adm3_lateral}
                 -- ADM2 polígonos: solo cuando el país no usa ADM3.
                 LEFT JOIN LATERAL (
                     SELECT
@@ -187,7 +223,7 @@ def resolve_geos_labels_for_ids(
             ) AS s
             WHERE t.id = s.id
             """,
-            [id_list],
+            [*adm3_params, id_list],
         )
         return cursor.rowcount
 
@@ -266,27 +302,27 @@ def iter_id_batches(
         last_id = batch[-1]
 
 
-def resolve_geos_labels_for_model_keys(
+def collect_ids_for_model_keys(
     model,
     key_fields: Sequence[str],
     keys: Sequence[tuple],
     *,
     base_filter: Optional[dict] = None,
-    force: bool = False,
-) -> int:
+) -> list[int]:
     """
-    Tras un bulk upsert: localiza ids por clave natural y resuelve labels.
+    Tras un bulk upsert: localiza ids por clave natural (sin resolver labels).
+
+    Es la parte barata (SELECT) de ``resolve_geos_labels_for_model_keys``;
+    se separa para poder encolar la resolución espacial fuera de la transacción
+    de write (ver ``enqueue_geos_labels_for_model_keys``).
     """
-    table = _validate_table(model._meta.db_table)
+    _validate_table(model._meta.db_table)
     if not keys:
-        return 0
+        return []
 
     qs = model.objects.filter(location__isnull=False)
     if base_filter:
         qs = qs.filter(**base_filter)
-
-    # Construir Q por tuplas de claves (en lotes para no exceder límites)
-    from django.db.models import Q
 
     ids: list[int] = []
     chunk = 500
@@ -297,4 +333,76 @@ def resolve_geos_labels_for_model_keys(
             q |= Q(**dict(zip(key_fields, key)))
         ids.extend(qs.filter(q).values_list("id", flat=True))
 
+    return [int(i) for i in ids if i is not None]
+
+
+def resolve_geos_labels_for_model_keys(
+    model,
+    key_fields: Sequence[str],
+    keys: Sequence[tuple],
+    *,
+    base_filter: Optional[dict] = None,
+    force: bool = False,
+) -> int:
+    """
+    Tras un bulk upsert: localiza ids por clave natural y resuelve labels.
+
+    Síncrono. Usado por backfill/tests; en el hot path de ingest se debe usar
+    :func:`enqueue_geos_labels_for_model_keys` para no bloquear ``process_file``.
+    """
+    table = _validate_table(model._meta.db_table)
+    ids = collect_ids_for_model_keys(
+        model, key_fields, keys, base_filter=base_filter
+    )
     return resolve_geos_labels_for_ids(table, ids, force=force)
+
+
+def enqueue_geos_labels_for_model_keys(
+    model,
+    key_fields: Sequence[str],
+    keys: Sequence[tuple],
+    *,
+    base_filter: Optional[dict] = None,
+) -> int:
+    """
+    Tras un bulk upsert: colecta ids por clave natural y encola la tarea Celery
+    ``resolve_geos_labels`` para resolver city/region/country/country_iso de
+    forma asíncrona. No bloquea la transacción de write.
+
+    Devuelve el número de ids encolados. Si no hay ids (sin GPS / sin filas
+    afectadas) o la app no tiene Celery configurado, es no-op.
+    """
+    table = _validate_table(model._meta.db_table)
+    ids = collect_ids_for_model_keys(
+        model, key_fields, keys, base_filter=base_filter
+    )
+    if not ids:
+        return 0
+
+    try:
+        from apps.wardriving.tasks import resolve_geos_labels
+    except Exception:
+        logger.exception(
+            "enqueue resolve_geos_labels: no se pudo importar la tarea; "
+            "resolve sync fallback table=%s ids=%d",
+            table,
+            len(ids),
+        )
+        # Fallback defensivo: resolver síncrono para no perder labels.
+        return resolve_geos_labels_for_ids(table, ids)
+
+    try:
+        resolve_geos_labels.apply_async(args=[table, ids])
+    except Exception:
+        logger.exception(
+            "apply_async resolve_geos_labels failed; sync fallback "
+            "table=%s ids=%d",
+            table,
+            len(ids),
+        )
+        return resolve_geos_labels_for_ids(table, ids)
+
+    logger.info(
+        "enqueued resolve_geos_labels table=%s ids=%d", table, len(ids)
+    )
+    return len(ids)

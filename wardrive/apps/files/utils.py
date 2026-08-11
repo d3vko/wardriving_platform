@@ -260,23 +260,35 @@ def _bulk_upsert_chunk(
     t_wr1 = time.perf_counter()
 
     # Denormalize city/country after location write (WiFi + LTE only).
+    # El cruce PostGIS es caro (LATERAL + ST_Intersects/ST_Area + KNN ADM3 sobre
+    # geos_city denso). Se encola post-commit en una tarea Celery para no
+    # bloquear process_file ni alargar la transacción de write. Ver
+    # apps.wardriving.tasks.resolve_geos_labels.
     if created or updated:
         try:
             from apps.wardriving.geos_labels import (
                 ALLOWED_TABLES,
-                resolve_geos_labels_for_model_keys,
+                enqueue_geos_labels_for_model_keys,
             )
 
             if model._meta.db_table in ALLOWED_TABLES:
-                resolve_geos_labels_for_model_keys(
-                    model,
-                    key_fields,
-                    keys,
-                    base_filter=base_filter,
-                )
+                _model = model
+                _key_fields = key_fields
+                _keys = keys
+                _base_filter = base_filter
+
+                def _enqueue_geos_labels():
+                    enqueue_geos_labels_for_model_keys(
+                        _model,
+                        _key_fields,
+                        _keys,
+                        base_filter=_base_filter,
+                    )
+
+                transaction.on_commit(_enqueue_geos_labels)
         except Exception:
             logger.exception(
-                "geos_labels resolve failed model=%s keys=%d",
+                "geos_labels enqueue failed model=%s keys=%d",
                 model.__name__,
                 len(keys),
             )

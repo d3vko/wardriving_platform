@@ -1,4 +1,6 @@
 from django.contrib.gis.db import models
+from django.contrib.postgres.indexes import GistIndex
+from django.db.models import Q
 
 from apps.core.models import BaseModel
 
@@ -54,6 +56,30 @@ class City(BaseModel):
             models.Index(fields=["country_iso", "city"]),
             models.Index(fields=["country_iso", "region", "city"]),
             models.Index(fields=["admin_level", "country_iso"]),
+            # GiST parciales sobre polygon: cada lateral de geos_labels filtra
+            # por `admin_level = N AND deleted_at IS NULL` + bbox `&&`. Un
+            # GiST por nivel vivo deja al planner un índice espacial ya acotado,
+            # evitando escanear polígonos soft-deleted / de otros niveles.
+            GistIndex(
+                fields=["polygon"],
+                name="geos_city_gist_adm0_alive",
+                condition=Q(admin_level=0, deleted_at__isnull=True),
+            ),
+            GistIndex(
+                fields=["polygon"],
+                name="geos_city_gist_adm1_alive",
+                condition=Q(admin_level=1, deleted_at__isnull=True),
+            ),
+            GistIndex(
+                fields=["polygon"],
+                name="geos_city_gist_adm2_alive",
+                condition=Q(admin_level=2, deleted_at__isnull=True),
+            ),
+            GistIndex(
+                fields=["polygon"],
+                name="geos_city_gist_adm3_alive",
+                condition=Q(admin_level=3, deleted_at__isnull=True),
+            ),
         ]
 
     def __str__(self):
