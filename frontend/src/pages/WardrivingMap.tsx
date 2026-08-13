@@ -362,7 +362,9 @@ export default function WardrivingMap() {
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            // OSM exige Referer en tiles; same-origin del documento lo omitía (403).
+            referrerPolicy="strict-origin-when-cross-origin"
           />
           <FitBounds places={data} />
           {data.map((p, i) => (
