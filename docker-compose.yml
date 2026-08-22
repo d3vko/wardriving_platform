@@ -124,7 +124,7 @@ services:
     restart: on-failure
 
   # ── wardrive-frontend ────────────────────────────────────────────────────────
-  # SPA React (Bun + Vite + MUI) servida por nginx bajo /ctf/
+  # SPA React (Bun + Vite + Ant Design) servida por nginx bajo /ctf/
   # Reemplaza ctfd_platform. Para desarrollo: usa el profile "dev" con volumen.
   wardrive-frontend:
     build:

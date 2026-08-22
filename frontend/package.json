@@ -10,13 +10,10 @@
     "preview": "bunx --bun vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^6.4.0",
-    "@mui/material": "^6.4.0",
-    "@mui/x-charts": "^8.28.0",
-    "@mui/x-date-pickers": "^8.27.2",
+    "@ant-design/icons": "^6.3.2",
+    "@ant-design/plots": "^2.6.8",
     "@sentry/react": "^10.68.0",
+    "antd": "^6.6.1",
     "dayjs": "^1.11.20",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",

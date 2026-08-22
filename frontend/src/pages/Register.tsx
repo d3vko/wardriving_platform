@@ -1,17 +1,6 @@
 import { useState } from 'react'
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Divider,
-  Link,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
-import { WifiFind as WifiFindIcon } from '@mui/icons-material'
+import { Alert, Button, Card, Divider, Form, Input, Space, Typography } from 'antd'
+import { WifiOutlined } from '@ant-design/icons'
 import { Link as RouterLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { ApiError } from '@/api/client'
@@ -29,11 +18,7 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }))
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     if (form.password !== form.passwordConfirm) {
       setError('Passwords do not match')
       return
@@ -50,113 +35,74 @@ export default function Register() {
     }
   }
 
-  const isValid =
-    form.username.trim() && form.email.trim() && form.password && form.passwordConfirm
+  const isValid = form.username.trim() && form.email.trim() && form.password && form.passwordConfirm
+  const mismatch = Boolean(form.passwordConfirm && form.password !== form.passwordConfirm)
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-        p: 2,
-      }}
-    >
-      <Paper
-        elevation={0}
-        sx={{
-          width: '100%',
-          maxWidth: 420,
-          p: 4,
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 3,
-        }}
-      >
-        <Stack alignItems="center" spacing={1} mb={3}>
-          <WifiFindIcon color="primary" sx={{ fontSize: 40 }} />
-          <Typography variant="h5" fontWeight={700}>
+    <div className="auth-page">
+      <Card className="auth-card auth-card-wide">
+        <Space direction="vertical" size="small" align="center" style={{ width: '100%', marginBottom: 24 }}>
+          <WifiOutlined style={{ fontSize: 40, color: 'var(--ant-color-primary)' }} />
+          <Typography.Title level={3} style={{ margin: 0 }}>
             Create account
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Join Wardrive
-          </Typography>
-        </Stack>
+          </Typography.Title>
+          <Typography.Text type="secondary">Join Wardrive</Typography.Text>
+        </Space>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
+          <Alert type="error" showIcon closable onClose={() => setError(null)} message={error} style={{ marginBottom: 16 }} />
         )}
 
-        <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={2}>
-            <TextField
-              label="Username"
+        <Form layout="vertical" onFinish={() => void handleSubmit()}>
+          <Form.Item label="Username">
+            <Input
               value={form.username}
-              onChange={set('username')}
+              onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
               autoFocus
-              fullWidth
               autoComplete="username"
               disabled={loading}
             />
-            <TextField
-              label="Email"
+          </Form.Item>
+          <Form.Item label="Email">
+            <Input
               type="email"
               value={form.email}
-              onChange={set('email')}
-              fullWidth
+              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
               autoComplete="email"
               disabled={loading}
             />
-            <TextField
-              label="Password"
-              type="password"
+          </Form.Item>
+          <Form.Item label="Password">
+            <Input.Password
               value={form.password}
-              onChange={set('password')}
-              fullWidth
+              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
               autoComplete="new-password"
               disabled={loading}
             />
-            <TextField
-              label="Confirm password"
-              type="password"
+          </Form.Item>
+          <Form.Item
+            label="Confirm password"
+            validateStatus={mismatch ? 'error' : undefined}
+            help={mismatch ? 'Passwords do not match' : undefined}
+          >
+            <Input.Password
               value={form.passwordConfirm}
-              onChange={set('passwordConfirm')}
-              fullWidth
+              onChange={(e) => setForm((p) => ({ ...p, passwordConfirm: e.target.value }))}
               autoComplete="new-password"
               disabled={loading}
-              error={Boolean(form.passwordConfirm && form.password !== form.passwordConfirm)}
-              helperText={
-                form.passwordConfirm && form.password !== form.passwordConfirm
-                  ? 'Passwords do not match'
-                  : undefined
-              }
             />
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              fullWidth
-              disabled={loading || !isValid}
-              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
-            >
-              {loading ? 'Registering…' : 'Create account'}
-            </Button>
-          </Stack>
-        </Box>
+          </Form.Item>
+          <Button type="primary" htmlType="submit" size="large" block loading={loading} disabled={!isValid}>
+            {loading ? 'Registering…' : 'Create account'}
+          </Button>
+        </Form>
 
-        <Divider sx={{ my: 3 }} />
+        <Divider />
 
-        <Typography variant="body2" color="text.secondary" textAlign="center">
-          Already have an account?{' '}
-          <Link component={RouterLink} to="/login" underline="hover">
-            Sign in
-          </Link>
-        </Typography>
-      </Paper>
-    </Box>
+        <Typography.Paragraph type="secondary" style={{ textAlign: 'center', marginBottom: 0 }}>
+          Already have an account? <RouterLink to="/login">Sign in</RouterLink>
+        </Typography.Paragraph>
+      </Card>
+    </div>
   )
 }

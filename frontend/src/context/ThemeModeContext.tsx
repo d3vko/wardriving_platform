@@ -1,9 +1,10 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ThemeProvider, CssBaseline } from '@mui/material'
-import { getTheme } from '@/theme'
+import { ConfigProvider, theme as antdTheme } from 'antd'
+import { getAntdTheme, type ColorMode } from '@/theme'
 
-type ColorMode = 'light' | 'dark'
+import 'antd/dist/reset.css'
+import '@/app.css'
 
 const STORAGE_KEY = 'wardrive-color-mode'
 
@@ -31,14 +32,18 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const theme = useMemo(() => getTheme(mode), [mode])
+  const theme = useMemo(() => {
+    const base = getAntdTheme(mode)
+    const algorithms =
+      mode === 'dark'
+        ? [antdTheme.darkAlgorithm, antdTheme.compactAlgorithm]
+        : [antdTheme.defaultAlgorithm, antdTheme.compactAlgorithm]
+    return { ...base, algorithm: algorithms }
+  }, [mode])
 
   return (
     <ThemeModeContext.Provider value={{ isDarkMode: mode === 'dark', toggleTheme }}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        {children}
-      </ThemeProvider>
+      <ConfigProvider theme={theme}>{children}</ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }

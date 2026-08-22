@@ -1,34 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Alert,
-  Box,
-  Card,
-  CardContent,
-  CardHeader,
-  CircularProgress,
-  Grid,
-  Paper,
-  Stack,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Tabs,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import {
-  BarChart as BarChartIcon,
-  CalendarMonth as CalendarMonthIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material'
-import { BarChart } from '@mui/x-charts'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
+import { Alert, Button, Card, DatePicker, Space, Spin, Table, Tabs, Tooltip, Typography } from 'antd'
+import { BarChartOutlined, CalendarOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Column } from '@ant-design/plots'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -44,7 +17,8 @@ import {
   fetchDetail,
 } from '@/api/analytics'
 import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
-import IconButton from '@mui/material/IconButton'
+import { RF_VILLAGE } from '@/theme'
+import { useThemeMode } from '@/context/ThemeModeContext'
 
 interface ChartData {
   label: string
@@ -79,47 +53,62 @@ function toChartData(rows: AnalyticsRow[], labelCol: string, valueCol: string): 
 function BarChartCard({
   title,
   data,
-  xLabel,
-  yLabel,
   loading,
   error,
 }: {
   title: string
   data: ChartData[]
-  xLabel: string
-  yLabel: string
   loading: boolean
   error: string | null
 }) {
+  const { isDarkMode } = useThemeMode()
+  const axisFill = isDarkMode ? RF_VILLAGE.textSecondary : '#434343'
   return (
-    <Card sx={{ height: '100%' }}>
-      <CardHeader
-        title={title}
-        titleTypographyProps={{ variant: 'subtitle1', fontWeight: 600 }}
-        sx={{ pb: 0 }}
-      />
-      <CardContent sx={{ pt: 1 }}>
-        {loading ? (
-          <Box display="flex" justifyContent="center" py={4}>
-            <CircularProgress size={32} />
-          </Box>
-        ) : error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : data.length === 0 ? (
-          <Typography variant="body2" color="text.secondary" textAlign="center" py={3}>
-            Sin datos
-          </Typography>
-        ) : (
-          <BarChart
-            xAxis={[{ scaleType: 'band', data: data.map((d) => d.label), label: xLabel }]}
-            series={[{ data: data.map((d) => d.value), label: yLabel }]}
-            height={280}
-          />
-        )}
-      </CardContent>
+    <Card title={title} style={{ height: '100%' }}>
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 32 }}>
+          <Spin />
+        </div>
+      ) : error ? (
+        <Alert type="error" message={error} />
+      ) : data.length === 0 ? (
+        <Typography.Paragraph type="secondary" style={{ textAlign: 'center' }}>
+          Sin datos
+        </Typography.Paragraph>
+      ) : (
+        <Column
+          data={data}
+          xField="label"
+          yField="value"
+          height={280}
+          color={RF_VILLAGE.purple}
+          axis={{
+            x: { labelFill: axisFill, titleFill: axisFill },
+            y: { labelFill: axisFill, titleFill: axisFill },
+          }}
+        />
+      )}
     </Card>
   )
 }
+
+const DETAIL_COLS = [
+  { dataIndex: 'ssid', title: 'SSID' },
+  { dataIndex: 'mac', title: 'MAC' },
+  { dataIndex: 'auth_mode', title: 'Auth Mode' },
+  { dataIndex: 'vendor', title: 'Fabricante' },
+  { dataIndex: 'registry', title: 'Registro' },
+  { dataIndex: 'source', title: 'Fuente' },
+  { dataIndex: 'signal_streng', title: 'Señal' },
+  { dataIndex: 'rssi', title: 'RSSI' },
+  { dataIndex: 'channel', title: 'Canal' },
+  { dataIndex: 'device_source', title: 'Dispositivo' },
+  { dataIndex: 'uploaded_by', title: 'Usuario' },
+  { dataIndex: 'first_seen', title: 'First Seen' },
+  { dataIndex: 'type', title: 'Tipo' },
+  { dataIndex: 'current_latitude', title: 'Latitud' },
+  { dataIndex: 'current_longitude', title: 'Longitud' },
+]
 
 function DetailTable({
   rows,
@@ -130,65 +119,20 @@ function DetailTable({
   loading: boolean
   error: string | null
 }) {
-  const cols = [
-    { key: 'ssid', label: 'SSID' },
-    { key: 'mac', label: 'MAC' },
-    { key: 'auth_mode', label: 'Auth Mode' },
-    { key: 'vendor', label: 'Fabricante' },
-    { key: 'registry', label: 'Registro' },
-    { key: 'source', label: 'Fuente' },
-    { key: 'signal_streng', label: 'Señal' },
-    { key: 'rssi', label: 'RSSI' },
-    { key: 'channel', label: 'Canal' },
-    { key: 'device_source', label: 'Dispositivo' },
-    { key: 'uploaded_by', label: 'Usuario' },
-    { key: 'first_seen', label: 'First Seen' },
-    { key: 'type', label: 'Tipo' },
-    { key: 'current_latitude', label: 'Latitud' },
-    { key: 'current_longitude', label: 'Longitud' },
-  ]
-
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" py={6}>
-        <CircularProgress />
-      </Box>
-    )
-  }
-  if (error) return <Alert severity="error">{error}</Alert>
-  if (rows.length === 0) {
-    return (
-      <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
-        No records for the selected period.
-      </Typography>
-    )
-  }
-
+  if (error) return <Alert type="error" message={error} />
   return (
-    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
-      <Table size="small" stickyHeader>
-        <TableHead>
-          <TableRow>
-            {cols.map((c) => (
-              <TableCell key={c.key} sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
-                {c.label}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.slice(0, 250).map((row, i) => (
-            <TableRow key={i} hover>
-              {cols.map((c) => (
-                <TableCell key={c.key} sx={{ whiteSpace: 'nowrap', fontSize: 12 }}>
-                  {row[c.key] != null ? String(row[c.key]) : '—'}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+    <Table
+      size="small"
+      loading={loading}
+      pagination={false}
+      scroll={{ x: true, y: 400 }}
+      dataSource={rows.slice(0, 250).map((row, i) => ({ key: i, ...row }))}
+      locale={{ emptyText: 'No records for the selected period.' }}
+      columns={DETAIL_COLS.map((c) => ({
+        ...c,
+        render: (value: unknown) => (value != null ? String(value) : '—'),
+      }))}
+    />
   )
 }
 
@@ -216,12 +160,12 @@ const INITIAL_STATE: AnalyticsState = {
 
 export default function Analytics() {
   const { user } = useAuth()
-  const [tab, setTab] = useState<0 | 1>(0)
+  const [tab, setTab] = useState<'self' | 'global'>('self')
   const [startDateInput, setStartDateInput] = useState(isoToDateInputValue(ANALYTICS_DEFAULTS.startDate))
   const [endDateInput, setEndDateInput] = useState(isoToDateInputValue(ANALYTICS_DEFAULTS.endDate))
   const [state, setState] = useState<AnalyticsState>(INITIAL_STATE)
 
-  const scope: AnalyticsScope = tab === 0 ? 'self-analytics' : 'global-analytics'
+  const scope: AnalyticsScope = tab === 'self' ? 'self-analytics' : 'global-analytics'
 
   const load = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, errors: {} }))
@@ -233,7 +177,7 @@ export default function Analytics() {
     const params = {
       first_seen_start: range.startIso,
       first_seen_end: range.endIso,
-      ...(tab === 0 && user?.username ? { author: user.username } : {}),
+      ...(tab === 'self' && user?.username ? { author: user.username } : {}),
     }
 
     const results = await Promise.allSettled([
@@ -241,7 +185,7 @@ export default function Analytics() {
       fetchByDevice(scope, params),
       fetchBySignal(scope, params),
       fetchByVendor(scope, params),
-      tab === 1
+      tab === 'global'
         ? fetchByAuthor({ first_seen_start: range.startIso, first_seen_end: range.endIso })
         : Promise.resolve(null),
       fetchDetail(scope, params),
@@ -276,173 +220,81 @@ export default function Analytics() {
   }, [load])
 
   return (
-    <Box>
-      <Stack direction="row" alignItems="center" spacing={1.5} mb={3}>
-        <BarChartIcon color="primary" sx={{ fontSize: 32 }} />
-        <Typography variant="h4" fontWeight={700}>
+    <div>
+      <div className="page-title-row">
+        <BarChartOutlined style={{ fontSize: 32, color: 'var(--ant-color-primary)' }} />
+        <Typography.Title level={2} style={{ margin: 0 }}>
           Analytics
-        </Typography>
+        </Typography.Title>
         <Tooltip title="Reload data">
-          <IconButton onClick={() => void load()} disabled={state.loading} size="small">
-            <RefreshIcon />
-          </IconButton>
+          <Button icon={<ReloadOutlined />} onClick={() => void load()} disabled={state.loading} />
         </Tooltip>
-      </Stack>
+      </div>
 
-      {/* Tabs */}
       <Tabs
-        value={tab}
-        onChange={(_, v: 0 | 1) => setTab(v)}
-        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label={`My data${user?.username ? ` (${user.username})` : ''}`} />
-        <Tab label="Global" />
-      </Tabs>
+        activeKey={tab}
+        onChange={(key) => setTab(key as 'self' | 'global')}
+        items={[
+          { key: 'self', label: `My data${user?.username ? ` (${user.username})` : ''}` },
+          { key: 'global', label: 'Global' },
+        ]}
+      />
 
-      {/* Date filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={1} alignItems="center" mb={2}>
-            <CalendarMonthIcon fontSize="small" color="primary" />
-            <Typography variant="subtitle2" color="text.secondary">
-              Date range filter
-            </Typography>
-          </Stack>
-          <LocalizationProvider dateAdapter={AdapterDayjs}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-end">
-              <DatePicker
-                label="From"
-                value={dayjs(startDateInput)}
-                minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
-                maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
-                onChange={(value: Dayjs | null) => {
-                  if (!value || !value.isValid()) return
-                  setStartDateInput(value.format('YYYY-MM-DD'))
-                }}
-                slotProps={{
-                  textField: {
-                    size: 'small',
-                    sx: { minWidth: 220 },
-                  },
-                }}
-              />
-              <DatePicker
-                label="To"
-                value={dayjs(endDateInput)}
-                minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
-                maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
-                onChange={(value: Dayjs | null) => {
-                  if (!value || !value.isValid()) return
-                  setEndDateInput(value.format('YYYY-MM-DD'))
-                }}
-                slotProps={{
-                  textField: {
-                    size: 'small',
-                    sx: { minWidth: 220 },
-                  },
-                }}
-              />
-              <Typography variant="caption" color="text.secondary" sx={{ pb: 1 }}>
-                Local timezone day bounds (00:00 - 23:59)
-              </Typography>
-            </Stack>
-          </LocalizationProvider>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="flex-end">
-            {tab === 0 && user?.username && (
-              <Typography variant="body2" color="text.secondary">
-                Filtered by user: <strong>{user.username}</strong>
-              </Typography>
-            )}
-          </Stack>
-        </CardContent>
+      <Card style={{ marginBottom: 24 }}>
+        <Space style={{ marginBottom: 12 }}>
+          <CalendarOutlined />
+          <Typography.Text type="secondary">Date range filter</Typography.Text>
+        </Space>
+        <Space wrap>
+          <DatePicker
+            value={dayjs(startDateInput)}
+            minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+            maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+            onChange={(value: Dayjs | null) => {
+              if (!value || !value.isValid()) return
+              setStartDateInput(value.format('YYYY-MM-DD'))
+            }}
+          />
+          <DatePicker
+            value={dayjs(endDateInput)}
+            minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+            maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+            onChange={(value: Dayjs | null) => {
+              if (!value || !value.isValid()) return
+              setEndDateInput(value.format('YYYY-MM-DD'))
+            }}
+          />
+          <Typography.Text type="secondary">Local timezone day bounds (00:00 - 23:59)</Typography.Text>
+        </Space>
+        {tab === 'self' && user?.username && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+            Filtered by user: <strong>{user.username}</strong>
+          </Typography.Paragraph>
+        )}
       </Card>
 
-      {/* Charts */}
-      <Grid container spacing={3} mb={3}>
-        <Grid item xs={12}>
-          <BarChartCard
-            title="Authentication modes"
-            data={state.authModes}
-            xLabel="Mode"
-            yLabel="Count"
-            loading={state.loading}
-            error={state.errors.authModes ?? null}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <BarChartCard
-            title="Devices"
-            data={state.byDevice}
-            xLabel="Device"
-            yLabel="Count"
-            loading={state.loading}
-            error={state.errors.byDevice ?? null}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <BarChartCard
-            title="Signal strength"
-            data={state.bySignal}
-            xLabel="Signal"
-            yLabel="Count"
-            loading={state.loading}
-            error={state.errors.bySignal ?? null}
-          />
-        </Grid>
-        {tab === 1 ? (
-          <Grid item xs={12}>
-            <BarChartCard
-              title="Contributors"
-              data={state.byAuthor}
-              xLabel="User"
-              yLabel="Count"
-              loading={state.loading}
-              error={state.errors.byAuthor ?? null}
-            />
-          </Grid>
+      <Space direction="vertical" size="large" style={{ width: '100%', marginBottom: 24 }}>
+        <BarChartCard title="Authentication modes" data={state.authModes} loading={state.loading} error={state.errors.authModes ?? null} />
+        <BarChartCard title="Devices" data={state.byDevice} loading={state.loading} error={state.errors.byDevice ?? null} />
+        <BarChartCard title="Signal strength" data={state.bySignal} loading={state.loading} error={state.errors.bySignal ?? null} />
+        {tab === 'global' ? (
+          <BarChartCard title="Contributors" data={state.byAuthor} loading={state.loading} error={state.errors.byAuthor ?? null} />
         ) : (
-          <Grid item xs={12}>
-            <BarChartCard
-              title="Vendors"
-              data={state.byVendor}
-              xLabel="Vendor"
-              yLabel="Count"
-              loading={state.loading}
-              error={state.errors.byVendor ?? null}
-            />
-          </Grid>
+          <BarChartCard title="Vendors" data={state.byVendor} loading={state.loading} error={state.errors.byVendor ?? null} />
         )}
-      </Grid>
-
-      {/* Vendor bar chart (global tab) */}
-      {tab === 1 && (
-        <Box mb={3}>
+        {tab === 'global' && (
           <BarChartCard
             title="Top vendors"
             data={state.byVendor.slice(0, 15)}
-            xLabel="Vendor"
-            yLabel="Count"
             loading={state.loading}
             error={state.errors.byVendor ?? null}
           />
-        </Box>
-      )}
+        )}
+      </Space>
 
-      {/* Detail table */}
-      <Card>
-        <CardHeader
-          title="Record detail"
-          subheader="At most 250 rows (server-limited query)"
-          titleTypographyProps={{ variant: 'h6', fontWeight: 600 }}
-        />
-        <CardContent sx={{ pt: 0 }}>
-          <DetailTable
-            rows={state.detail}
-            loading={state.loading}
-            error={state.errors.detail ?? null}
-          />
-        </CardContent>
+      <Card title="Record detail" extra="At most 250 rows (server-limited query)">
+        <DetailTable rows={state.detail} loading={state.loading} error={state.errors.detail ?? null} />
       </Card>
-    </Box>
+    </div>
   )
 }

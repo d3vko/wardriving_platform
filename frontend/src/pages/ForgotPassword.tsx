@@ -1,16 +1,6 @@
 import { useState } from 'react'
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Link,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
-import { LockReset as LockResetIcon } from '@mui/icons-material'
+import { Alert, Button, Card, Form, Input, Space, Typography } from 'antd'
+import { LockOutlined } from '@ant-design/icons'
 import { Link as RouterLink } from 'react-router-dom'
 import { requestPasswordReset } from '@/api/auth'
 import { ApiError } from '@/api/client'
@@ -21,8 +11,7 @@ export default function ForgotPassword() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     if (!email.trim()) return
     setError(null)
     setLoading(true)
@@ -37,82 +26,47 @@ export default function ForgotPassword() {
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-        p: 2,
-      }}
-    >
-      <Paper
-        elevation={0}
-        sx={{
-          width: '100%',
-          maxWidth: 400,
-          p: 4,
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 3,
-        }}
-      >
-        <Stack alignItems="center" spacing={1} mb={3}>
-          <LockResetIcon color="primary" sx={{ fontSize: 40 }} />
-          <Typography variant="h5" fontWeight={700}>
+    <div className="auth-page">
+      <Card className="auth-card">
+        <Space direction="vertical" size="small" align="center" style={{ width: '100%', marginBottom: 24 }}>
+          <LockOutlined style={{ fontSize: 40, color: 'var(--ant-color-primary)' }} />
+          <Typography.Title level={3} style={{ margin: 0 }}>
             Recuperar contraseña
-          </Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center">
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ textAlign: 'center' }}>
             Ingresa tu correo y te enviaremos instrucciones para restablecerla.
-          </Typography>
-        </Stack>
+          </Typography.Text>
+        </Space>
 
         {sent ? (
-          <Alert severity="success">
-            Si el correo está registrado, recibirás un enlace en tu bandeja de entrada.
-          </Alert>
+          <Alert type="success" showIcon message="Si el correo está registrado, recibirás un enlace en tu bandeja de entrada." />
         ) : (
           <>
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                {error}
-              </Alert>
+              <Alert type="error" showIcon closable onClose={() => setError(null)} message={error} style={{ marginBottom: 16 }} />
             )}
-
-            <Box component="form" onSubmit={handleSubmit}>
-              <Stack spacing={2}>
-                <TextField
-                  label="Correo electrónico"
+            <Form layout="vertical" onFinish={() => void handleSubmit()}>
+              <Form.Item label="Correo electrónico">
+                <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoFocus
-                  fullWidth
                   autoComplete="email"
                   disabled={loading}
                 />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  disabled={loading || !email.trim()}
-                  startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
-                >
-                  {loading ? 'Enviando…' : 'Enviar instrucciones'}
-                </Button>
-              </Stack>
-            </Box>
+              </Form.Item>
+              <Button type="primary" htmlType="submit" size="large" block loading={loading} disabled={!email.trim()}>
+                {loading ? 'Enviando…' : 'Enviar instrucciones'}
+              </Button>
+            </Form>
           </>
         )}
 
-        <Box mt={3} textAlign="center">
-          <Link component={RouterLink} to="/login" variant="body2" underline="hover">
-            Volver al inicio de sesión
-          </Link>
-        </Box>
-      </Paper>
-    </Box>
+        <div style={{ marginTop: 24, textAlign: 'center' }}>
+          <RouterLink to="/login">Volver al inicio de sesión</RouterLink>
+        </div>
+      </Card>
+    </div>
   )
 }

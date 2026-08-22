@@ -1,17 +1,6 @@
 import { useState } from 'react'
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Divider,
-  Link,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
-import { WifiFind as WifiFindIcon } from '@mui/icons-material'
+import { Alert, Button, Card, Divider, Form, Input, Space, Typography } from 'antd'
+import { WifiOutlined } from '@ant-design/icons'
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { ApiError } from '@/api/client'
@@ -27,8 +16,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     if (!identifier.trim() || !password) return
     setError(null)
     setLoading(true)
@@ -43,90 +31,59 @@ export default function Login() {
   }
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-        p: 2,
-      }}
-    >
-      <Paper
-        elevation={0}
-        sx={{
-          width: '100%',
-          maxWidth: 400,
-          p: 4,
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 3,
-        }}
-      >
-        <Stack alignItems="center" spacing={1} mb={3}>
-          <WifiFindIcon color="primary" sx={{ fontSize: 40 }} />
-          <Typography variant="h5" fontWeight={700}>
+    <div className="auth-page">
+      <Card className="auth-card">
+        <Space direction="vertical" size="small" align="center" style={{ width: '100%', marginBottom: 24 }}>
+          <WifiOutlined style={{ fontSize: 40, color: 'var(--ant-color-primary)' }} />
+          <Typography.Title level={3} style={{ margin: 0 }}>
             Wardrive
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Inicia sesión para continuar
-          </Typography>
-        </Stack>
+          </Typography.Title>
+          <Typography.Text type="secondary">Inicia sesión para continuar</Typography.Text>
+        </Space>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
+          <Alert type="error" showIcon closable onClose={() => setError(null)} message={error} style={{ marginBottom: 16 }} />
         )}
 
-        <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={2}>
-            <TextField
-              label="Usuario o correo"
+        <Form layout="vertical" onFinish={() => void handleSubmit()}>
+          <Form.Item label="Usuario o correo">
+            <Input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               autoFocus
-              fullWidth
               autoComplete="username"
               disabled={loading}
             />
-            <TextField
-              label="Contraseña"
-              type="password"
+          </Form.Item>
+          <Form.Item label="Contraseña">
+            <Input.Password
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              fullWidth
               autoComplete="current-password"
               disabled={loading}
             />
-            <Box textAlign="right" mt={-1}>
-              <Link component={RouterLink} to="/forgot-password" variant="body2" underline="hover">
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </Box>
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              fullWidth
-              disabled={loading || !identifier.trim() || !password}
-              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : null}
-            >
-              {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
-            </Button>
-          </Stack>
-        </Box>
+          </Form.Item>
+          <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 16 }}>
+            <RouterLink to="/forgot-password">¿Olvidaste tu contraseña?</RouterLink>
+          </div>
+          <Button
+            type="primary"
+            htmlType="submit"
+            size="large"
+            block
+            loading={loading}
+            disabled={!identifier.trim() || !password}
+          >
+            {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
+          </Button>
+        </Form>
 
-        <Divider sx={{ my: 3 }} />
+        <Divider />
 
-        <Typography variant="body2" color="text.secondary" textAlign="center">
-          ¿No tienes cuenta?{' '}
-          <Link component={RouterLink} to="/register" underline="hover">
-            Regístrate
-          </Link>
-        </Typography>
-      </Paper>
-    </Box>
+        <Typography.Paragraph type="secondary" style={{ textAlign: 'center', marginBottom: 0 }}>
+          ¿No tienes cuenta? <RouterLink to="/register">Regístrate</RouterLink>
+        </Typography.Paragraph>
+      </Card>
+    </div>
   )
 }

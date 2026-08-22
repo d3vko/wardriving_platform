@@ -1,36 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Alert,
-  Box,
-  Chip,
-  CircularProgress,
-  Stack,
-  Paper,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from '@mui/material'
-import Pagination from '@mui/material/Pagination'
+import { Alert, Card, DatePicker, Pagination, Radio, Space, Spin, Tag, Typography } from 'antd'
 import L from 'leaflet'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { useSearchParams } from 'react-router-dom'
+import dayjs from 'dayjs'
 
 import { ANALYTICS_DEFAULTS } from '@/api/analytics'
-import {
-  fetchLtePlaces,
-  fetchWifiPlaces,
-  type WardrivingPlace,
-} from '@/api/wardriveMap'
+import { fetchLtePlaces, fetchWifiPlaces, type WardrivingPlace } from '@/api/wardriveMap'
 import { useAuth } from '@/context/AuthContext'
+import { useThemeMode } from '@/context/ThemeModeContext'
 import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { DatePicker } from '@mui/x-date-pickers/DatePicker'
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs'
-import dayjs, { type Dayjs } from 'dayjs'
 
 import 'leaflet/dist/leaflet.css'
 
-/** Puntos visibles por página del mapa. */
 const VIEW_SIZE = 500
 
 const DEFAULT_CENTER: [number, number] = [40.4168, -3.7038]
@@ -39,15 +21,15 @@ const DEFAULT_ZOOM = 6
 function signalColor(signal: string): string {
   switch (signal) {
     case 'Excellent':
-      return '#2e7d32'
+      return '#15803d'
     case 'Good':
-      return '#66bb6a'
+      return '#16a34a'
     case 'Fair':
-      return '#ed6c02'
+      return '#c2410c'
     case 'Weak':
-      return '#c62828'
+      return '#b91c1c'
     default:
-      return '#1976d2'
+      return '#B026FF'
   }
 }
 
@@ -86,6 +68,7 @@ function parsePageParam(raw: string | null): number {
 
 export default function WardrivingMap() {
   const { user } = useAuth()
+  const { isDarkMode } = useThemeMode()
   const [searchParams, setSearchParams] = useSearchParams()
   const modeParam = searchParams.get('mode')
   const mode: 'wifi' | 'lte' = modeParam === 'lte' ? 'lte' : 'wifi'
@@ -124,8 +107,8 @@ export default function WardrivingMap() {
   )
 
   const handleModeChange = useCallback(
-    (_: unknown, value: 'wifi' | 'lte' | null) => {
-      if (!value) return
+    (value: string | number) => {
+      if (value !== 'wifi' && value !== 'lte') return
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev)
         next.set('mode', value)
@@ -143,15 +126,18 @@ export default function WardrivingMap() {
       minIso: ANALYTICS_DEFAULTS.minDate,
       maxIso: ANALYTICS_DEFAULTS.maxDate,
     })
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (next.get('first_seen_after') === normalized.startIso && next.get('first_seen_before') === normalized.endIso) {
-        return prev
-      }
-      next.set('first_seen_after', normalized.startIso)
-      next.set('first_seen_before', normalized.endIso)
-      return next
-    }, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (next.get('first_seen_after') === normalized.startIso && next.get('first_seen_before') === normalized.endIso) {
+          return prev
+        }
+        next.set('first_seen_after', normalized.startIso)
+        next.set('first_seen_before', normalized.endIso)
+        return next
+      },
+      { replace: true },
+    )
   }, [first_seen_after, first_seen_before, setSearchParams])
 
   const [data, setData] = useState<WardrivingPlace[]>([])
@@ -194,8 +180,6 @@ export default function WardrivingMap() {
     }
   }, [mode, page, first_seen_after, first_seen_before, user?.username])
 
-  const pageCount = Math.max(1, Math.ceil(total / VIEW_SIZE) || 1)
-
   useEffect(() => {
     if (total <= 0) return
     const maxPage = Math.ceil(total / VIEW_SIZE)
@@ -203,156 +187,89 @@ export default function WardrivingMap() {
   }, [total, page, setPage])
 
   return (
-    <Stack spacing={2} sx={{ height: '100%', minHeight: 480 }}>
-      <Box>
-        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
-          <Typography variant="h5" fontWeight={700}>
-            Wardriving map
-          </Typography>
-          <Chip label="WiFi / LTE · REST" size="small" variant="outlined" color="secondary" />
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Map data (WiFi and LTE) loads via HTTP REST. Up to{' '}
-          {VIEW_SIZE} pins per page. Date filters in the URL (
-          <code>first_seen_after</code>, <code>first_seen_before</code>). Legend by signal strength.
+    <div className="map-shell">
+      <Card
+        size="small"
+        title="Wardriving map"
+        extra={
+          <Space>
+            <Tag color="processing">REST</Tag>
+            <Tag>{mode.toUpperCase()}</Tag>
+          </Space>
+        }
+      >
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+          Hasta {VIEW_SIZE} pines por página. Filtros en la URL (<code>first_seen_after</code>,{' '}
+          <code>first_seen_before</code>).
           {user?.username ? (
-            <> Showing your points (<code>uploaded_by</code> scoped to your account).</>
+            <>
+              {' '}
+              Puntos de <code>{user.username}</code>.
+            </>
           ) : null}
-        </Typography>
-      </Box>
+        </Typography.Paragraph>
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} flexWrap="wrap">
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} flexWrap="wrap">
-            <DatePicker
-              label="From"
-              value={dayjs(isoToDateInputValue(first_seen_after))}
-              minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
-              maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
-              disabled={loading}
-              onChange={(value: Dayjs | null) => {
-                if (!value || !value.isValid()) return
-                setDateRange(value.format('YYYY-MM-DD'), isoToDateInputValue(first_seen_before))
-              }}
-              slotProps={{
-                textField: { size: 'small', sx: { minWidth: 240 } },
-              }}
-            />
-            <DatePicker
-              label="To"
-              value={dayjs(isoToDateInputValue(first_seen_before))}
-              minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
-              maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
-              disabled={loading}
-              onChange={(value: Dayjs | null) => {
-                if (!value || !value.isValid()) return
-                setDateRange(isoToDateInputValue(first_seen_after), value.format('YYYY-MM-DD'))
-              }}
-              slotProps={{
-                textField: { size: 'small', sx: { minWidth: 240 } },
-              }}
-            />
-          </Stack>
-        </LocalizationProvider>
-      </Stack>
-
-      <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
-        <ToggleButtonGroup
-          value={mode}
-          exclusive
-          onChange={handleModeChange}
-          size="small"
-          disabled={loading}
-          aria-label="Map mode"
-        >
-          <ToggleButton value="wifi">WiFi</ToggleButton>
-          <ToggleButton value="lte">LTE</ToggleButton>
-        </ToggleButtonGroup>
-        {!loading && (
-          <Chip
-            size="small"
-            label={`${total} records · view ${page} / ${pageCount}`}
-            variant="outlined"
+        <Space wrap style={{ marginBottom: 12 }} size="middle">
+          <DatePicker.RangePicker
+            disabled={loading}
+            allowClear={false}
+            value={[
+              dayjs(isoToDateInputValue(first_seen_after)),
+              dayjs(isoToDateInputValue(first_seen_before)),
+            ]}
+            minDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.minDate))}
+            maxDate={dayjs(isoToDateInputValue(ANALYTICS_DEFAULTS.maxDate))}
+            onChange={(dates) => {
+              if (!dates?.[0] || !dates?.[1]) return
+              setDateRange(dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD'))
+            }}
           />
-        )}
-      </Stack>
+          <Radio.Group
+            optionType="button"
+            buttonStyle="solid"
+            disabled={loading}
+            value={mode}
+            onChange={(e) => handleModeChange(e.target.value)}
+            options={[
+              { label: 'WiFi', value: 'wifi' },
+              { label: 'LTE', value: 'lte' },
+            ]}
+          />
+        </Space>
 
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          py: 1,
-          px: 1.5,
-          borderRadius: 2,
-          bgcolor: 'action.hover',
-        }}
-      >
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
-          Pins on map: view <strong>{page}</strong> of <strong>{pageCount}</strong>
-          {total > 0 ? ` (${data.length} on screen)` : ''}
-        </Typography>
-        <Pagination
-          count={pageCount}
-          page={page}
-          onChange={(_, p) => setPage(p)}
-          color="primary"
-          size="small"
-          showFirstButton
-          showLastButton
-          disabled={loading || total === 0}
-          siblingCount={1}
-          boundaryCount={1}
-        />
-      </Box>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Typography.Text type="secondary">
+            {loading ? 'Cargando…' : `${total.toLocaleString()} registros · ${data.length} en pantalla`}
+          </Typography.Text>
+          <Pagination
+            size="small"
+            current={page}
+            total={total}
+            pageSize={VIEW_SIZE}
+            onChange={setPage}
+            showSizeChanger={false}
+            disabled={loading || total === 0}
+            showQuickJumper
+            showTotal={(t, range) => `${range[0]}-${range[1]} de ${t}`}
+          />
+        </div>
+      </Card>
 
-      {error && (
-        <Alert severity="error" onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert type="error" closable onClose={() => setError(null)} message={error} />}
 
-      <Paper
-        variant="outlined"
-        sx={{
-          flex: 1,
-          minHeight: 420,
-          position: 'relative',
-          overflow: 'hidden',
-          borderRadius: 2,
-        }}
-      >
+      <div className="map-frame">
         {loading && (
-          <Box
+          <div
+            className={isDarkMode ? 'map-overlay map-overlay-dark' : 'map-overlay'}
             role="progressbar"
             aria-busy="true"
             aria-live="polite"
             aria-label="Cargando datos del mapa"
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 1400,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              px: 3,
-              bgcolor: 'rgba(255, 255, 255, 0.92)',
-              backdropFilter: 'blur(6px)',
-              borderRadius: 2,
-            }}
           >
-            <CircularProgress size={48} thickness={4} />
-            <Typography variant="body1" color="text.secondary" textAlign="center" fontWeight={500}>
-              Cargando datos del mapa…
-            </Typography>
-            <Typography variant="caption" color="text.disabled" textAlign="center" sx={{ maxWidth: 280 }}>
-              Espera un momento; el mapa no está disponible hasta que termine la carga.
-            </Typography>
-          </Box>
+            <Spin size="large" />
+            <Typography.Text>Cargando datos del mapa…</Typography.Text>
+            <Typography.Text type="secondary">Espera un momento; el mapa no está disponible hasta que termine la carga.</Typography.Text>
+          </div>
         )}
         <MapContainer
           center={DEFAULT_CENTER}
@@ -361,9 +278,17 @@ export default function WardrivingMap() {
           style={{ height: '100%', width: '100%', minHeight: 420 }}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            // OSM exige Referer en tiles; same-origin del documento lo omitía (403).
+            key={isDarkMode ? 'carto-dark' : 'osm'}
+            attribution={
+              isDarkMode
+                ? '&copy; OSM &copy; CARTO'
+                : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }
+            url={
+              isDarkMode
+                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            }
             referrerPolicy="strict-origin-when-cross-origin"
           />
           <FitBounds places={data} />
@@ -380,49 +305,47 @@ export default function WardrivingMap() {
               }}
             >
               <Popup>
-                <Stack spacing={0.5} sx={{ minWidth: 200 }}>
-                  <Typography variant="subtitle2" fontWeight={700}>
-                    {p.vendor || '—'}
-                  </Typography>
-                  <Typography variant="caption" component="div">
+                <div style={{ minWidth: 200 }}>
+                  <Typography.Text strong>{p.vendor || '—'}</Typography.Text>
+                  <div>
                     <strong>MAC / ID:</strong> {p.mac}
-                  </Typography>
-                  <Typography variant="caption" component="div">
+                  </div>
+                  <div>
                     <strong>SSID:</strong> {p.ssid || '—'}
-                  </Typography>
-                  <Typography variant="caption" component="div">
+                  </div>
+                  <div>
                     <strong>Signal:</strong> {p.signal_streng}
-                  </Typography>
-                  <Typography variant="caption" component="div">
+                  </div>
+                  <div>
                     <strong>Type:</strong> {p.type} · <strong>Auth:</strong> {p.auth_mode || '—'}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  </div>
+                  <Typography.Text type="secondary">
                     {p.device_source} · {p.uploaded_by || '—'}
-                  </Typography>
-                </Stack>
+                  </Typography.Text>
+                </div>
               </Popup>
             </CircleMarker>
           ))}
         </MapContainer>
-      </Paper>
+      </div>
 
-      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-        <Typography variant="caption" color="text.secondary">
-          Legend:
-        </Typography>
+      <Space wrap>
+        <Typography.Text type="secondary">Legend:</Typography.Text>
         {['Excellent', 'Good', 'Fair', 'Weak'].map((s) => (
-          <Chip
+          <Tag
             key={s}
-            size="small"
-            label={s}
-            sx={{
-              bgcolor: signalColor(s),
-              color: s === 'Fair' ? '#000' : '#fff',
+            bordered={false}
+            style={{
+              marginInlineEnd: 0,
+              backgroundColor: signalColor(s),
+              color: '#fff',
               fontWeight: 600,
             }}
-          />
+          >
+            {s}
+          </Tag>
         ))}
-      </Stack>
-    </Stack>
+      </Space>
+    </div>
   )
 }
