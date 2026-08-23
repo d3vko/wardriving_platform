@@ -20,6 +20,7 @@ import logging
 from pandas import read_csv
 
 from apps.process._wigle_canonical.aliases import resolve_headers
+from apps.process._wigle_canonical.detect import wigle_csv_skiprows
 from apps.process._wigle_canonical.persist import persist_canonical_rows
 from apps.process._wigle_canonical.schema import CanonicalRow, coerce_row
 from apps.wardriving.models import SourceDevice
@@ -35,8 +36,8 @@ def process_file_minino(
     """
     Process Minino / PwnTerrey Marauder CSV export.
 
-    Line 1: metadata (WigleWifi-style or device header) — skipped via skiprows=1.
-    Line 2: column headers (MAC, SSID, AuthMode, FirstSeen, Channel, …).
+    Line 1: optional WiGLE metadata (`WigleWifi-…`); if the first line is already
+    a header (MAC/SSID/…), skiprows is 0. Sentinels ``nan`` in SSID are dropped.
 
     Supports alias variants via resolve_headers() (BSSID, Capabilities, etc.)
     and applies sanitize_security() automatically through coerce_row().
@@ -45,7 +46,7 @@ def process_file_minino(
         df = read_csv(
             file_path,
             encoding="utf-8",
-            skiprows=1,
+            skiprows=wigle_csv_skiprows(file_path, "utf-8"),
             on_bad_lines="skip",
             dtype=str,
             keep_default_na=False,
@@ -54,7 +55,7 @@ def process_file_minino(
         df = read_csv(
             file_path,
             encoding="latin-1",
-            skiprows=1,
+            skiprows=wigle_csv_skiprows(file_path, "latin-1"),
             on_bad_lines="skip",
             dtype=str,
             keep_default_na=False,

@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode, SVGProps } from 'react'
+import brandKombiUrl from '@/assets/brand-kombi.png'
 
 const wrapStyle: CSSProperties = {
   display: 'inline-flex',
@@ -31,33 +32,29 @@ export function NavHomeIcon() {
   )
 }
 
-/** Combi 3/4 + WiFi: solo brand del sider. */
+/** Combi 3/4 + WiFi: silueta de la imagen de referencia (mask). */
 export function NavBrandIcon() {
   return (
-    <NavSvg>
-      <path
-        fillRule="evenodd"
-        d="M4.1 12.1c0-2.15 1.55-3.55 4.15-3.75 3.55-.25 7.15-.15 9.35.55 1.7.55 3.15 1.85 3.15 3.55v2.85c0 1.05-.85 1.85-1.9 1.95l-12.7.55c-1.15.05-2.05-.85-2.05-2V12.1Zm3.05.05c0-.28.22-.5.5-.5h1.55c.28 0 .5.22.5.5v1.55c0 .28-.22.5-.5.5H7.65a.5.5 0 0 1-.5-.5V12.15Zm2.85 0c0-.28.22-.5.5-.5h1.55c.28 0 .5.22.5.5v1.55c0 .28-.22.5-.5.5h-1.55a.5.5 0 0 1-.5-.5V12.15Zm2.85 0c0-.28.22-.5.5-.5h1.45c.28 0 .5.22.5.5v1.45c0 .28-.22.5-.5.5h-1.45a.5.5 0 0 1-.5-.5v-1.45ZM17.05 13.85a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8Zm2.2.25a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.85 13.55h1.7v.42H4.85v-.42Zm0 1h1.7v.42H4.85v-.42Zm0 1h1.7v.42H4.85v-.42ZM7.35 16.55a1.65 1.65 0 1 0 .05 3.3 1.65 1.65 0 0 0-.05-3.3Zm7.55.15a1.55 1.55 0 1 0 0 3.1 1.55 1.55 0 0 0 0-3.1Z"
-      />
-      <circle cx="7.37" cy="18.2" r="0.48" />
-      <circle cx="14.9" cy="18.25" r="0.45" />
-      <rect x="11.45" y="7.85" width="1.5" height="0.7" rx="0.2" />
-      <path d="M12.2 7.85V4.95" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
-      <path
-        d="M10.45 4.35c1-.9 2.5-.9 3.5 0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-      />
-      <path
-        d="M9.25 2.95c1.7-1.5 4.2-1.5 5.9 0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-      />
-    </NavSvg>
+    <span
+      className="anticon nav-rf-icon nav-brand-icon"
+      role="img"
+      aria-hidden
+      style={{
+        display: 'inline-block',
+        width: 32,
+        height: 32,
+        flexShrink: 0,
+        backgroundColor: 'currentColor',
+        WebkitMaskImage: `url(${brandKombiUrl})`,
+        maskImage: `url(${brandKombiUrl})`,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+      }}
+    />
   )
 }
 

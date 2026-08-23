@@ -18,6 +18,7 @@ import logging
 from pandas import read_csv
 
 from apps.process._wigle_canonical.aliases import resolve_headers
+from apps.process._wigle_canonical.detect import wigle_csv_skiprows
 from apps.process._wigle_canonical.persist import persist_canonical_rows
 from apps.process._wigle_canonical.sanitizers import sanitize_security as sanitize_auth_mode  # re-export compat
 from apps.process._wigle_canonical.schema import CanonicalRow, coerce_row
@@ -45,7 +46,7 @@ def process_file_wiggle_mobile_wifi(
         df = read_csv(
             file_path,
             encoding="utf-8",
-            skiprows=1,
+            skiprows=wigle_csv_skiprows(file_path, "utf-8"),
             on_bad_lines="skip",
             dtype=str,
             keep_default_na=False,
@@ -54,7 +55,7 @@ def process_file_wiggle_mobile_wifi(
         df = read_csv(
             file_path,
             encoding="latin-1",
-            skiprows=1,
+            skiprows=wigle_csv_skiprows(file_path, "latin-1"),
             on_bad_lines="skip",
             dtype=str,
             keep_default_na=False,

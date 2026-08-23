@@ -76,6 +76,11 @@ body {
   text-shadow: 0 0 8px rgba(74, 246, 38, 0.55);
 }
 
+.app-sider-brand .nav-brand-icon {
+  width: 32px;
+  height: 32px;
+}
+
 .ant-menu-item .nav-rf-icon,
 .ant-menu-item .nav-rf-icon svg {
   font-size: 20px;

@@ -54,6 +54,26 @@ def _is_metadata_line(line: str) -> bool:
     return bool(s and (s.startswith("WigleWifi") or s.startswith("WiGL")))
 
 
+def wigle_csv_skiprows(file_path: str, encoding: str = "utf-8") -> int:
+    """
+    How many leading rows to skip before the CSV header.
+
+    Minino / WiGLE Mobile typically start with ``WigleWifi-…`` → skip 1.
+    Some dumps put the header on line 1 → skip 0.
+    Unknown first line defaults to 1 (historical Minino).
+    """
+    try:
+        with open(file_path, "r", encoding=encoding, errors="replace") as fh:
+            first = (fh.readline() or "").strip()
+    except OSError:
+        return 1
+    if _is_header_line(first):
+        return 0
+    if _is_metadata_line(first):
+        return 1
+    return 1
+
+
 def detect_dialect(
     sample_lines: list[str],
 ) -> Literal["csv_header", "log_indexed", "log_classic"]:

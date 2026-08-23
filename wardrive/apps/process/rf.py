@@ -15,6 +15,66 @@ from apps.wardriving.geo import enrich_row_location
 from apps.wardriving.models import LTEWardriving, Wardriving, SourceDevice
 from apps.wardriving import LteCellType
 
+_MISSING_TEXT = frozenset(
+    {
+        "",
+        "nan",
+        "NaN",
+        "NaT",
+        "None",
+        "none",
+        "null",
+        "NULL",
+        "<NA>",
+    }
+)
+
+
+def _is_missing_scalar(val) -> bool:
+    """True for None, pandas NA, and string sentinels (nan/null/empty)."""
+    if val is None:
+        return True
+    try:
+        if isna(val):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return str(val).strip() in _MISSING_TEXT
+
+
+def _normalize_band(val) -> str:
+    """Persist LTE band as text: missing → '0'; whole floats → '7' not '7.0'."""
+    if _is_missing_scalar(val):
+        return "0"
+    s = str(val).strip()
+    try:
+        f = float(s)
+        if f != f:
+            return "0"
+        if f == int(f):
+            return str(int(f))
+        return str(f)
+    except (TypeError, ValueError):
+        return s
+
+
+def _normalize_tech(val) -> str:
+    if _is_missing_scalar(val):
+        return "LTE"
+    return str(val).strip()
+
+
+def _normalize_provider(val) -> str:
+    if _is_missing_scalar(val):
+        return "Not Provided"
+    return str(val).strip() or "Not Provided"
+
+
+def _normalize_wifi_text(val, default: str = "") -> str:
+    if _is_missing_scalar(val):
+        return default
+    return str(val).strip()
+
 
 def _to_int(val, default: int = 0) -> int:
     """Convert a value to int, returning default if None, NaN, or unparseable."""
@@ -219,7 +279,7 @@ def process_lte_wardriving(
         row = {
             "uploaded_by": uploaded_by,
             "device_source": device_source,
-            "tech": instance_data.get("tech"),
+            "tech": _normalize_tech(instance_data.get("tech")),
             "mcc": instance_data.get("mcc"),
             "mnc": instance_data.get("mnc"),
             "lac": instance_data.get("lac"),
@@ -237,8 +297,8 @@ def process_lte_wardriving(
             "rsrp": _to_int(instance_data.get("rsrp")),
             "rsrq": _to_int(instance_data.get("rsrq")),
             "sinr": _to_int(instance_data.get("sinr")),
-            "band": instance_data.get("band"),
-            "provider": instance_data.get("provider") or "Not Provided",
+            "band": _normalize_band(instance_data.get("band")),
+            "provider": _normalize_provider(instance_data.get("provider")),
             "current_longitude": instance_data.get("current_longitude"),
             "current_latitude": instance_data.get("current_latitude"),
         }
@@ -550,14 +610,14 @@ def process_wifi_rf_wardriving(
             "uploaded_by": uploaded_by,
             "mac": rec["mac"],
             "channel": int(rec["channel"]),
-            "ssid": rec.get("ssid"),
-            "auth_mode": rec.get("auth_mode"),
+            "ssid": _normalize_wifi_text(rec.get("ssid"), default=""),
+            "auth_mode": _normalize_wifi_text(rec.get("auth_mode"), default=""),
             "first_seen": fs,
             "current_latitude": rec.get("current_latitude"),
             "current_longitude": rec.get("current_longitude"),
             "rssi": rec.get("rssi"),
             "device_source": device_source,
-            "type": (rec.get("type") or "WIFI"),
+            "type": _normalize_wifi_text(rec.get("type"), default="WIFI") or "WIFI",
         }
         if rec.get("altitude_meters") is not None and notna(rec.get("altitude_meters")):
             row["altitude_meters"] = rec["altitude_meters"]
@@ -670,9 +730,9 @@ def process_file_rf(
             )
     else:
         try:
-            df = read_csv(file_path, encoding="utf-8", sep=",", low_memory=False)
+            df = read_csv(file_path, encoding="utf-8", sep=",", low_memory=False, keep_default_na=False)
         except UnicodeDecodeError:
-            df = read_csv(file_path, encoding="latin-1", sep=",", low_memory=False)
+            df = read_csv(file_path, encoding="latin-1", sep=",", low_memory=False, keep_default_na=False)
 
     return cls_process(
         device_source=device_source, uploaded_by=uploaded_by, dataframe=df

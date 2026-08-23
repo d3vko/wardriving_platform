@@ -790,11 +790,10 @@ class MininoProcessorTests(SimpleTestCase):
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
         try:
-            # skiprows=1 skips the header, so use skiprows=0 equivalent:
-            # to test the sentinel directly, call coerce_row with 'nan' SSID
             process_file_minino(file_path=path, uploaded_by="test")
-            # The row may or may not appear depending on skiprows, but if it
-            # does appear ssid must be absent; verify via coerce_row directly.
+            rows = mock_bulk.call_args.kwargs["rows"]
+            self.assertEqual(len(rows), 1)
+            self.assertNotIn("ssid", rows[0])
         finally:
             os.unlink(path)
 

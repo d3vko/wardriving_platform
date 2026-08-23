@@ -125,9 +125,21 @@ def process_file_lte_android(
     filters out placeholder/unserved-cell rows automatically.
     """
     try:
-        df = read_csv(file_path, encoding="utf-8", sep=",", low_memory=False)
+        df = read_csv(
+            file_path,
+            encoding="utf-8",
+            sep=",",
+            low_memory=False,
+            keep_default_na=False,
+        )
     except UnicodeDecodeError:
-        df = read_csv(file_path, encoding="latin-1", sep=",", low_memory=False)
+        df = read_csv(
+            file_path,
+            encoding="latin-1",
+            sep=",",
+            low_memory=False,
+            keep_default_na=False,
+        )
 
     return process_lte_wardriving(
         device_source=device_source,

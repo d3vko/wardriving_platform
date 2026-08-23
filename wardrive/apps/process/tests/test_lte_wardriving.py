@@ -341,3 +341,60 @@ class MissingFreqFieldsTests(SimpleTestCase):
         self.assertEqual(row["rsrp"], -93)
         self.assertEqual(row["rsrq"], -12)
         self.assertEqual(row["sinr"], 8)
+
+
+# Band / text sentinels (synthetic GPS and cell ids only).
+_SYN_CELL_BAND_NAN = 25600040
+_SYN_CELL_BAND_FLOAT = 25600041
+_SYN_MAC_RF = "aa:bb:cc:dd:ee:10"
+
+BAND_EMPTY_CSV = f"""\
+Timestamp,Tecnología,TipoCelda,Estado,MCC,MNC,LAC,CellID,eNodeB,Sector,PCI,Banda,EARFCN,FreqDL_MHz,FreqUL_MHz,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
+2025-06-14 15:00:20,nan,serving,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_BAND_NAN},{_SYN_ENODEB},10,{_SYN_PCI},,0,0,0,-85,-93,-12,8,nan,{_SYN_LON},{_SYN_LAT}
+"""
+
+BAND_FLOAT_CSV = f"""\
+Timestamp,Tecnología,TipoCelda,Estado,MCC,MNC,LAC,CellID,eNodeB,Sector,PCI,Banda,EARFCN,FreqDL_MHz,FreqUL_MHz,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
+2025-06-14 15:00:21,LTE,serving,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_BAND_FLOAT},{_SYN_ENODEB},11,{_SYN_PCI},7.0,2825,2627.5,2507.5,-80,-88,-10,5,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
+"""
+
+WIFI_RF_NAN_CSV = f"""\
+Timestamp,Lat,Long,SSID,BSSID,Canal,Señal,Seguridad
+2025-06-14 15:00:30,{_SYN_LAT},{_SYN_LON},nan,{_SYN_MAC_RF},6,-70,nan
+"""
+
+
+class BandAndTextSentinelTests(SimpleTestCase):
+    def test_empty_band_becomes_zero_string(self):
+        rows = _captured_rows(BAND_EMPTY_CSV)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["band"], "0")
+
+    def test_nan_tech_and_provider(self):
+        rows = _captured_rows(BAND_EMPTY_CSV)
+        self.assertEqual(rows[0]["tech"], "LTE")
+        self.assertEqual(rows[0]["provider"], "Not Provided")
+
+    def test_float_band_strips_point_zero(self):
+        rows = _captured_rows(BAND_FLOAT_CSV)
+        self.assertEqual(rows[0]["band"], "7")
+
+
+class WifiRfTextSentinelTests(SimpleTestCase):
+    def test_ssid_and_auth_nan_become_empty(self):
+        from apps.process.rf import process_wifi_rf_wardriving
+
+        captured = []
+
+        def fake_bulk(*, model, key_fields, rows, **kwargs):
+            captured.extend(rows)
+            return len(rows), 0, 0
+
+        with patch(_PATCH_BULK, side_effect=fake_bulk):
+            process_wifi_rf_wardriving(dataframe=_df(WIFI_RF_NAN_CSV))
+
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0]["ssid"], "")
+        self.assertEqual(captured[0]["auth_mode"], "")
+        self.assertEqual(captured[0]["type"], "WIFI")
+
