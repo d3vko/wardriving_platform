@@ -127,12 +127,205 @@ body {
   text-align: center;
 }
 
+.upload-page-body {
+  width: 100%;
+  max-width: min(960px, 100%);
+}
+
+.upload-device-carousel-wrap {
+  margin-top: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
 .upload-dropzone {
   border: 2px dashed var(--ant-color-border, #d9d9d9);
   border-radius: 8px;
   padding: 32px;
   text-align: center;
   cursor: pointer;
+}
+
+.device-source-carousel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+
+.device-source-carousel-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 4px;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  padding: 6px 2px 12px;
+  flex: 1;
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #b026ff rgba(176, 38, 255, 0.14);
+}
+
+.device-source-carousel-track::-webkit-scrollbar {
+  height: 8px;
+}
+
+.device-source-carousel-track::-webkit-scrollbar-track {
+  background: rgba(176, 38, 255, 0.12);
+  border-radius: 999px;
+}
+
+.device-source-carousel-track::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, #7b1fa2, #b026ff);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.device-source-carousel-track::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, #b026ff, #4af626);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.device-card {
+  position: relative;
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+  width: clamp(148px, 34vw, 188px);
+  min-height: 168px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 10px;
+  background: var(--ant-color-bg-container, #fff);
+  padding: 12px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.device-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ant-color-primary, #b026ff);
+}
+
+.device-card.selected {
+  border-color: var(--ant-color-primary, #b026ff);
+  box-shadow: 0 0 0 1px var(--ant-color-primary, #b026ff),
+    0 0 16px rgba(176, 38, 255, 0.25);
+}
+
+.device-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.device-card-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.device-card-image img {
+  width: clamp(72px, 20vw, 96px);
+  height: clamp(72px, 20vw, 96px);
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+.device-card-label {
+  display: block;
+  width: 100%;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.device-card-label .ant-typography {
+  display: block;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-size: clamp(12px, 3vw, 13px);
+  line-height: 1.25;
+}
+
+.device-card-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  color: var(--ant-color-primary, #b026ff);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.device-source-carousel-arrow {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 575px) {
+  .upload-page-body {
+    max-width: 100%;
+  }
+
+  .upload-dropzone {
+    padding: 20px 16px;
+  }
+
+  /* Touch-first: hide side arrows; swipe the track */
+  .device-source-carousel-arrow {
+    display: none;
+  }
+
+  .device-source-carousel-track {
+    gap: 10px;
+    padding-inline: 2px;
+  }
+
+  .device-card {
+    width: min(48vw, 168px);
+    padding: 10px 8px 8px;
+  }
+
+  .device-card:hover {
+    transform: none;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 991px) {
+  .upload-page-body {
+    max-width: min(720px, 100%);
+  }
+
+  .device-card {
+    width: 168px;
+  }
+
+  .device-card-image img {
+    width: 84px;
+    height: 84px;
+  }
+}
+
+@media (min-width: 992px) {
+  .device-source-carousel {
+    gap: 8px;
+  }
+}
+
+@media (hover: none) {
+  .device-card:hover {
+    transform: none;
+  }
 }
 
 .home-logo {

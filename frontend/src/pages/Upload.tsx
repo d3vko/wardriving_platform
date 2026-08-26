@@ -5,7 +5,6 @@ import {
   Card,
   List,
   Progress,
-  Select,
   Space,
   Tag,
   Typography,
@@ -19,6 +18,7 @@ import {
 } from '@ant-design/icons'
 import { getDeviceSources, MAX_UPLOAD_FILES, uploadFiles } from '@/api/files'
 import type { DeviceSource } from '@/api/files'
+import DeviceSourceCarousel from '@/components/DeviceSourceCarousel'
 import { ApiError } from '@/api/client'
 
 interface UploadResult {
@@ -103,7 +103,7 @@ export default function Upload() {
   }
 
   return (
-    <div>
+    <div className="upload-page">
       <div className="page-title-row">
         <CloudUploadOutlined style={{ fontSize: 32, color: 'var(--ant-color-primary)' }} />
         <Typography.Title level={2} style={{ margin: 0 }}>
@@ -114,17 +114,17 @@ export default function Upload() {
         Upload wardriving capture logs. Multiple files are accepted at once.
       </Typography.Paragraph>
 
-      <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: 640 }}>
-        <div>
+      <Space direction="vertical" size="large" className="upload-page-body">
+        <div className="upload-device-section">
           <Typography.Text>Device type</Typography.Text>
-          <Select
-            style={{ width: '100%', marginTop: 8 }}
-            value={deviceSource || undefined}
-            onChange={setDeviceSource}
-            disabled={loading}
-            status={fieldError && !deviceSource ? 'error' : undefined}
-            options={deviceSources.map((ds) => ({ value: ds.value, label: ds.label }))}
-          />
+          <div className="upload-device-carousel-wrap">
+            <DeviceSourceCarousel
+              options={deviceSources}
+              value={deviceSource}
+              onChange={setDeviceSource}
+              disabled={loading}
+            />
+          </div>
           <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
             {fieldError && !deviceSource ? (
               fieldError
