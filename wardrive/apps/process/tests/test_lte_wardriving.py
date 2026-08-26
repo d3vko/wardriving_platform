@@ -312,6 +312,73 @@ class LteAndroidWrapperTests(SimpleTestCase):
             self.assertEqual(row["uploaded_by"], "test_user")
 
 
+# Android keep_default_na=False leaves empty CGI as "" — must not reach upsert.
+_SYN_CELL_EMPTY_CGI_SERVING = 25600050
+
+ANDROID_EMPTY_CGI_CSV = f"""\
+Timestamp,Tecnología,TipoCelda,Estado,MCC,MNC,LAC,CellID,eNodeB,Sector,PCI,Banda,EARFCN,FreqDL_MHz,FreqUL_MHz,RSSI,RSRP,RSRQ,SINR,Operador,Longitud,Latitud
+2025-06-14 15:01:00,LTE,LTE,0,,,,,,,24,7,2975,2642.5,2522.5,-123,-123,-19,0,{_SYN_OPERATOR},0.0000000,0.0000000
+2025-06-14 15:01:01,LTE,LTE,1,{_SYN_MCC},{_SYN_MNC},{_SYN_LAC},{_SYN_CELL_EMPTY_CGI_SERVING},{_SYN_ENODEB},25,{_SYN_PCI},7,2975,2642.5,2522.5,-112,-112,-9,9,{_SYN_OPERATOR},{_SYN_LON},{_SYN_LAT}
+"""
+
+
+class AndroidEmptyCgiFilterTests(SimpleTestCase):
+    """
+    Regression: Android Estado=0 rows with empty MCC/MNC/LAC/CellID must be
+    dropped so Postgres never sees "" / NaN on IntegerField CGI keys.
+    Uses process_file_lte_android (keep_default_na=False).
+    """
+
+    def _run_wrapper(self, csv_text: str) -> list[dict]:
+        from apps.process.android import process_file_lte_android
+
+        captured = []
+
+        def fake_bulk(*, model, key_fields, rows, **kwargs):
+            captured.extend(rows)
+            return len(rows), 0, 0
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False, encoding="utf-8"
+        ) as fh:
+            fh.write(csv_text)
+            tmp_path = fh.name
+
+        try:
+            with patch(_PATCH_BULK, side_effect=fake_bulk):
+                process_file_lte_android(file_path=tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        return captured
+
+    def test_empty_cgi_row_dropped_serving_kept(self):
+        rows = self._run_wrapper(ANDROID_EMPTY_CGI_CSV)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["cell_id"], _SYN_CELL_EMPTY_CGI_SERVING)
+        self.assertEqual(rows[0]["mcc"], _SYN_MCC)
+        self.assertEqual(rows[0]["mnc"], _SYN_MNC)
+        self.assertEqual(rows[0]["lac"], _SYN_LAC)
+
+    def test_cgi_fields_are_plain_ints(self):
+        rows = self._run_wrapper(ANDROID_EMPTY_CGI_CSV)
+        row = rows[0]
+        for key in ("mcc", "mnc", "lac", "cell_id"):
+            self.assertIsInstance(row[key], int)
+            self.assertNotEqual(str(row[key]), "")
+            self.assertFalse(
+                isinstance(row[key], float) and row[key] != row[key],
+                msg=f"{key} must not be NaN",
+            )
+
+    def test_neighbor_cell_id_zero_still_kept(self):
+        """RF neighbor with cell_id=0 and filled MCC/MNC/LAC must still upsert."""
+        rows = self._run_wrapper(EXTENDED_CSV)
+        neighbor = next(r for r in rows if r["cell_type"] == LteCellType.NEIGHBOR)
+        self.assertEqual(neighbor["cell_id"], 0)
+        self.assertEqual(neighbor["mcc"], _SYN_MCC)
+        self.assertEqual(neighbor["mnc"], _SYN_MNC)
+
 class MissingFreqFieldsTests(SimpleTestCase):
     """
     Regression tests for the NaN bug: when FreqDL_MHz / FreqUL_MHz are empty

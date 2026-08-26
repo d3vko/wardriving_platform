@@ -22,6 +22,7 @@ LTE source (lte_android):
     - CellID == 268435455  (0x0FFFFFFF sentinel)
     - LAC    == 65535      (0xFFFF sentinel)
     - MCC    == 0
+    - Empty / NA CGI (MCC, MNC, LAC, CellID) — e.g. Estado=0 rows
     - Rows with missing or non-numeric GPS coordinates
 
   Delegates to process_lte_wardriving (rf.py).

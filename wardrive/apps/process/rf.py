@@ -135,7 +135,10 @@ def process_lte_wardriving(
       - CellID == 268435455  (0x0FFFFFFF sentinel for "no cell")
       - LAC    == 65535      (0xFFFF sentinel for "no LAC")
       - MCC    == 0          (invalid country code)
+      - Empty / NA CGI fields (MCC, MNC, LAC, CellID) — Android Estado=0 rows
       - Rows with empty Latitude or Longitude (no GPS fix)
+
+    Neighbor rows may keep cell_id == 0 when MCC/MNC/LAC are present.
     """
     dataframe = dataframe if dataframe is not None else DataFrame()
     if dataframe.empty:
@@ -197,7 +200,9 @@ def process_lte_wardriving(
 
     # Coerce key identifier columns to numeric so sentinel comparisons work
     # regardless of whether the CSV was read as str or int.
-    for _col in ("cell_id", "lac", "mcc", "state", "enodeb_id", "sector_id",
+    # mnc must be included: keep_default_na=False leaves empty cells as "" which
+    # Postgres rejects as integer (invalid input syntax for type integer: "").
+    for _col in ("cell_id", "lac", "mcc", "mnc", "state", "enodeb_id", "sector_id",
                  "pci", "earfcn"):
         if _col in dataframe.columns:
             dataframe[_col] = to_numeric(dataframe[_col], errors="coerce")
@@ -225,7 +230,12 @@ def process_lte_wardriving(
     #   CellID 268435455 (0x0FFFFFFF) — no cell locked
     #   LAC    65535     (0xFFFF)     — no LAC
     #   MCC    0         — invalid country code
+    #   Empty CGI (MCC/MNC/LAC/CellID NA) — Android Estado=0 / no lock
     #   Missing lat/lon  — no GPS fix
+    # cell_id == 0 is kept (RF neighbor rows); only NA cell_id is dropped.
+    _cgi_required = [c for c in ("mcc", "mnc", "lac", "cell_id") if c in dataframe.columns]
+    if _cgi_required:
+        dataframe = dataframe.dropna(subset=_cgi_required)
     if "cell_id" in dataframe.columns:
         dataframe = dataframe[dataframe["cell_id"] != 268435455]
     if "lac" in dataframe.columns:
@@ -280,10 +290,10 @@ def process_lte_wardriving(
             "uploaded_by": uploaded_by,
             "device_source": device_source,
             "tech": _normalize_tech(instance_data.get("tech")),
-            "mcc": instance_data.get("mcc"),
-            "mnc": instance_data.get("mnc"),
-            "lac": instance_data.get("lac"),
-            "cell_id": cell_id_val,
+            "mcc": _to_int(instance_data.get("mcc")),
+            "mnc": _to_int(instance_data.get("mnc")),
+            "lac": _to_int(instance_data.get("lac")),
+            "cell_id": _to_int(cell_id_val),
             "cell_type": instance_data.get("cell_type", LteCellType.SERVING),
             "state": _to_int(instance_data.get("state")),
             "enodeb_id": int(enodeb) if enodeb is not None and not isna(enodeb) else 0,
