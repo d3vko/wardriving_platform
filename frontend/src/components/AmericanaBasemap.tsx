@@ -4,18 +4,20 @@ import { maplibreGL } from '@maplibre/maplibre-gl-leaflet'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
 
-/** StyleJSON same-origin (wardrive_proxy). El JSON remoto sigue trayendo URLs absolutas; se reescriben abajo. */
+/** StyleJSON same-origin (wardrive_proxy). Teselas vectoriales OSM US van directo del browser. */
 export const AMERICANA_STYLE_URL = '/map-americana/style.json'
 
 const AMERICANA_ATTRIBUTION =
   '<a href="https://tiles.openstreetmap.us/">Tiles by OSM US</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> · <a href="https://github.com/osm-americana/openstreetmap-americana">Americana</a>'
 
-/** Orígenes de Americana / OSM US → paths de nginx (antes de location / de Metabase). */
+/**
+ * Solo style/sprites/fonts por nginx. No reescribir tiles.openstreetmap.us:
+ * Cloudflare bloquea el fetch server-side; el browser ya tiene CORS para este origen.
+ */
 const NGINX_AMERICANA_PREFIXES: [string, string][] = [
   ['https://americanamap.org/style.json', '/map-americana/style.json'],
   ['https://americanamap.org/sprites/', '/map-americana/sprites/'],
   ['https://font.americanamap.org/', '/map-americana/fonts/'],
-  ['https://tiles.openstreetmap.us/', '/map-americana/osm-us/'],
 ]
 
 export function rewriteAmericanaUrl(url: string): string {
