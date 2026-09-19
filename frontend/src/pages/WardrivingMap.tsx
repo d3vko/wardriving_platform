@@ -278,17 +278,9 @@ export default function WardrivingMap() {
           style={{ height: '100%', width: '100%', minHeight: 420 }}
         >
           <TileLayer
-            key={isDarkMode ? 'carto-dark' : 'carto-light'}
-            attribution={
-              isDarkMode
-                ? '&copy; OSM &copy; CARTO'
-                : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-            }
-            url={
-              isDarkMode
-                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                : '/map-tiles/{z}/{x}/{y}.png'
-            }
+            key="osm-fr"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &middot; tiles by <a href="https://www.openstreetmap.fr/">OSM France</a>'
+            url="/map-tiles/{z}/{x}/{y}.png"
             referrerPolicy="strict-origin-when-cross-origin"
           />
           <FitBounds places={data} />
