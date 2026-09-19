@@ -21,16 +21,6 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN: string
   readonly VITE_SENTRY_ENVIRONMENT: string
   readonly VITE_SENTRY_TRACES_SAMPLE_RATE: string
-  readonly VITE_MAPLIBRE_STYLE_URL?: string
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv
-}
-
-declare module '*?worker&url' {
-  const workerUrl: string
-  export default workerUrl
 }
 
 interface ImportMeta {

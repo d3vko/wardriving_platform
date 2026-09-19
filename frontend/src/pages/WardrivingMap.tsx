@@ -1,16 +1,22 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Card, DatePicker, Pagination, Radio, Space, Spin, Tag, Typography } from 'antd'
+import L from 'leaflet'
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 
 import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import { fetchLtePlaces, fetchWifiPlaces, type WardrivingPlace } from '@/api/wardriveMap'
-import AmericanaBasemap from '@/components/AmericanaBasemap'
 import { useAuth } from '@/context/AuthContext'
 import { useThemeMode } from '@/context/ThemeModeContext'
 import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
 
+import 'leaflet/dist/leaflet.css'
+
 const VIEW_SIZE = 500
+
+const DEFAULT_CENTER: [number, number] = [40.4168, -3.7038]
+const DEFAULT_ZOOM = 6
 
 function signalColor(signal: string): string {
   switch (signal) {
@@ -25,6 +31,33 @@ function signalColor(signal: string): string {
     default:
       return '#B026FF'
   }
+}
+
+function FitBounds({ places }: { places: WardrivingPlace[] }) {
+  const map = useMap()
+  const coords = useMemo(
+    () =>
+      places
+        .filter(
+          (p) =>
+            p.current_latitude != null &&
+            p.current_longitude != null &&
+            !(p.current_latitude === 0 && p.current_longitude === 0),
+        )
+        .map((p) => [p.current_latitude, p.current_longitude] as [number, number]),
+    [places],
+  )
+
+  useEffect(() => {
+    if (coords.length === 0) {
+      map.setView(DEFAULT_CENTER, DEFAULT_ZOOM)
+      return
+    }
+    const b = L.latLngBounds(coords)
+    map.fitBounds(b, { padding: [48, 48], maxZoom: 16 })
+  }, [coords, map])
+
+  return null
 }
 
 function parsePageParam(raw: string | null): number {
@@ -238,7 +271,62 @@ export default function WardrivingMap() {
             <Typography.Text type="secondary">Espera un momento; el mapa no está disponible hasta que termine la carga.</Typography.Text>
           </div>
         )}
-        <AmericanaBasemap places={data} />
+        <MapContainer
+          center={DEFAULT_CENTER}
+          zoom={DEFAULT_ZOOM}
+          scrollWheelZoom={!loading}
+          style={{ height: '100%', width: '100%', minHeight: 420 }}
+        >
+          <TileLayer
+            key={isDarkMode ? 'carto-dark' : 'carto-light'}
+            attribution={
+              isDarkMode
+                ? '&copy; OSM &copy; CARTO'
+                : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+            }
+            url={
+              isDarkMode
+                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                : '/map-tiles/{z}/{x}/{y}.png'
+            }
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+          <FitBounds places={data} />
+          {data.map((p, i) => (
+            <CircleMarker
+              key={`${mode}-${p.mac}-${i}-${page}`}
+              center={[p.current_latitude, p.current_longitude]}
+              radius={8}
+              pathOptions={{
+                color: signalColor(p.signal_streng),
+                fillColor: signalColor(p.signal_streng),
+                fillOpacity: 0.65,
+                weight: 1,
+              }}
+            >
+              <Popup>
+                <div style={{ minWidth: 200 }}>
+                  <Typography.Text strong>{p.vendor || '—'}</Typography.Text>
+                  <div>
+                    <strong>MAC / ID:</strong> {p.mac}
+                  </div>
+                  <div>
+                    <strong>SSID:</strong> {p.ssid || '—'}
+                  </div>
+                  <div>
+                    <strong>Signal:</strong> {p.signal_streng}
+                  </div>
+                  <div>
+                    <strong>Type:</strong> {p.type} · <strong>Auth:</strong> {p.auth_mode || '—'}
+                  </div>
+                  <Typography.Text type="secondary">
+                    {p.device_source} · {p.uploaded_by || '—'}
+                  </Typography.Text>
+                </div>
+              </Popup>
+            </CircleMarker>
+          ))}
+        </MapContainer>
       </div>
 
       <Space wrap>

@@ -1,6 +1,5 @@
-import { lazy, Suspense, useMemo } from 'react'
+import { useMemo } from 'react'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
-import { Spin } from 'antd'
 import { AuthProvider } from '@/context/AuthContext'
 import { ThemeModeProvider } from '@/context/ThemeModeContext'
 import Layout from '@/components/Layout'
@@ -12,23 +11,8 @@ import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
 import Upload from '@/pages/Upload'
 import Analytics from '@/pages/Analytics'
+import WardrivingMap from '@/pages/WardrivingMap'
 import KmlDownloads from '@/pages/KmlDownloads'
-
-const WardrivingMap = lazy(() => import('@/pages/WardrivingMap'))
-
-function MapPage() {
-  return (
-    <Suspense
-      fallback={
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <Spin size="large" />
-        </div>
-      }
-    >
-      <WardrivingMap />
-    </Suspense>
-  )
-}
 
 function AppRoutes() {
   const router = useMemo(
@@ -47,7 +31,7 @@ function AppRoutes() {
             ),
             children: [
               { index: true, element: <Home /> },
-              { path: 'map', element: <MapPage /> },
+              { path: 'map', element: <WardrivingMap /> },
               { path: 'analytics', element: <Analytics /> },
               { path: 'upload', element: <Upload /> },
               { path: 'downloads', element: <KmlDownloads /> },
