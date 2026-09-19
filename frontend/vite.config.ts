@@ -35,6 +35,7 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           antd: ['antd', '@ant-design/icons', '@ant-design/plots'],
+          maplibre: ['maplibre-gl', '@maplibre/maplibre-gl-leaflet'],
         },
       },
     },

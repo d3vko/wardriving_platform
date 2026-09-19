@@ -150,6 +150,7 @@ services:
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN}
         VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT}
         VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE}
+        VITE_MAPLIBRE_STYLE_URL: ${VITE_MAPLIBRE_STYLE_URL:-}
     image: wardrive-frontend
     depends_on:
       - wardrive

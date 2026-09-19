@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Card, DatePicker, Pagination, Radio, Space, Spin, Tag, Typography } from 'antd'
 import L from 'leaflet'
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
+import { MapContainer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 
 import { ANALYTICS_DEFAULTS } from '@/api/analytics'
 import { fetchLtePlaces, fetchWifiPlaces, type WardrivingPlace } from '@/api/wardriveMap'
+import AmericanaBasemap from '@/components/AmericanaBasemap'
 import { useAuth } from '@/context/AuthContext'
 import { useThemeMode } from '@/context/ThemeModeContext'
 import { dateInputToDayRangeIso, isoToDateInputValue } from '@/utils/datetimeLocal'
@@ -277,20 +278,7 @@ export default function WardrivingMap() {
           scrollWheelZoom={!loading}
           style={{ height: '100%', width: '100%', minHeight: 420 }}
         >
-          <TileLayer
-            key={isDarkMode ? 'carto-dark' : 'osm'}
-            attribution={
-              isDarkMode
-                ? '&copy; OSM &copy; CARTO'
-                : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }
-            url={
-              isDarkMode
-                ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-            }
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+          <AmericanaBasemap />
           <FitBounds places={data} />
           {data.map((p, i) => (
             <CircleMarker

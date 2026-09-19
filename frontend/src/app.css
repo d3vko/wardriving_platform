@@ -60,6 +60,17 @@ body {
   border-radius: 6px;
 }
 
+.map-frame .leaflet-gl-layer,
+.map-frame .maplibregl-map,
+.map-frame .maplibregl-canvas {
+  pointer-events: none;
+}
+
+.map-frame .maplibregl-ctrl-attrib,
+.map-frame .maplibregl-ctrl-bottom-right {
+  display: none;
+}
+
 .app-sider-brand {
   height: 48px;
   display: flex;
