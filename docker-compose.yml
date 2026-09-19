@@ -187,6 +187,10 @@ services:
   wardrive_bi:
     image: metabase/metabase:v0.63.2.x
     env_file: .env
+    environment:
+      # OSM volunteer tiles 403 Metabase. Default: CARTO CDN (no nginx).
+      # Same-origin via proxy: https://<public-host>/map-tiles/{z}/{x}/{y}.png
+      MB_MAP_TILE_SERVER_URL: "${MB_MAP_TILE_SERVER_URL:-https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png}"
     volumes:
       - metabase_data:/metabase-data
     healthcheck:
