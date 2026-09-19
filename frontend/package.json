@@ -12,20 +12,16 @@
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
     "@ant-design/plots": "^2.6.8",
-    "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@sentry/react": "^10.68.0",
     "antd": "^6.6.1",
     "dayjs": "^1.11.20",
-    "leaflet": "^1.9.4",
     "maplibre-gl": "^6.10.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
-    "@types/leaflet": "^1.9.21",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -60,15 +60,12 @@ body {
   border-radius: 6px;
 }
 
-.map-frame .leaflet-gl-layer,
-.map-frame .maplibregl-map,
-.map-frame .maplibregl-canvas {
-  pointer-events: none;
-}
-
-.map-frame .maplibregl-ctrl-attrib,
-.map-frame .maplibregl-ctrl-bottom-right {
-  display: none;
+.map-frame .americana-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
 }
 
 .app-sider-brand {
