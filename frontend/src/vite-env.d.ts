@@ -27,3 +27,12 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+declare module '*?worker&url' {
+  const workerUrl: string
+  export default workerUrl
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}

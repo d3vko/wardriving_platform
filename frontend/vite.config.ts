@@ -17,6 +17,12 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  optimizeDeps: {
+    exclude: ['maplibre-gl'],
+  },
+  worker: {
+    format: 'es',
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -46,7 +52,6 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           antd: ['antd', '@ant-design/icons', '@ant-design/plots'],
-          maplibre: ['maplibre-gl'],
         },
       },
     },

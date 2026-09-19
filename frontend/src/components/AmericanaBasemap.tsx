@@ -6,11 +6,15 @@ import {
   MapLayerMouseEvent,
   NavigationControl,
   Popup,
+  setWorkerUrl,
 } from 'maplibre-gl'
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 
 import type { WardrivingPlace } from '@/api/wardriveMap'
 
 import 'maplibre-gl/dist/maplibre-gl.css'
+
+setWorkerUrl(maplibreWorkerUrl)
 
 /** StyleJSON same-origin (wardrive_proxy). Teselas vectoriales OSM US van directo del browser. */
 export const AMERICANA_STYLE_URL = '/map-americana/style.json'
