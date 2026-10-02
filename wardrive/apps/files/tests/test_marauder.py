@@ -830,8 +830,30 @@ class MininoProcessorTests(SimpleTestCase):
         """PWNTERREY_MARAUDER must still map to process_file_minino in CHOICES_FUNCTION_PROCESS."""
         from apps.process import CHOICES_FUNCTION_PROCESS
         from apps.process.minino import process_file_minino
-        from apps.wardriving.models import SourceDevice
+        from apps.wardriving import SourceDevice
         self.assertIs(
             CHOICES_FUNCTION_PROCESS[SourceDevice.PWNTERREY_MARAUDER],
             process_file_minino,
+        )
+
+    def test_minino_rf_village_mx_wardriver_routes_to_minino(self):
+        """New RF Village MX WebSerial source must map to process_file_minino."""
+        from apps.process import CHOICES_FUNCTION_PROCESS
+        from apps.process.minino import process_file_minino
+        from apps.wardriving import SourceDevice
+
+        self.assertEqual(
+            SourceDevice.MININO_RF_VILLAGE_MX_WARDRIVER,
+            "minino rf village mx wardriver",
+        )
+        self.assertIs(
+            CHOICES_FUNCTION_PROCESS[SourceDevice.MININO_RF_VILLAGE_MX_WARDRIVER],
+            process_file_minino,
+        )
+        self.assertIn(
+            (
+                SourceDevice.MININO_RF_VILLAGE_MX_WARDRIVER,
+                SourceDevice.MININO_RF_VILLAGE_MX_WARDRIVER,
+            ),
+            SourceDevice.AVAILABLE_CHOICES,
         )

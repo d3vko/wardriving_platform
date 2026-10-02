@@ -10,6 +10,7 @@ class LteCellType:
 class SourceDevice:
     UNKNOWN = "unknown"
     MININO = "minino"
+    MININO_RF_VILLAGE_MX_WARDRIVER = "minino rf village mx wardriver"
     FLIPPER_DEV_BOARD = "flipper dev board"
     FLIPPER_DEV_BOARD_PRO = "flipper dev board pro"
     MARAUDER_V4 = "marauder v4"
@@ -30,6 +31,7 @@ class SourceDevice:
     CHOICES = [
         (UNKNOWN, UNKNOWN),
         (MININO, MININO),
+        (MININO_RF_VILLAGE_MX_WARDRIVER, MININO_RF_VILLAGE_MX_WARDRIVER),
         (FLIPPER_DEV_BOARD, FLIPPER_DEV_BOARD),
         (FLIPPER_DEV_BOARD_PRO, FLIPPER_DEV_BOARD_PRO),
         (MARAUDER_V4, MARAUDER_V4),
@@ -56,6 +58,7 @@ class SourceDevice:
         (WIFI_BLE_ANDROID, WIFI_BLE_ANDROID),
         (LTE_ANDROID, LTE_ANDROID),
         (MININO, MININO),
+        (MININO_RF_VILLAGE_MX_WARDRIVER, MININO_RF_VILLAGE_MX_WARDRIVER),
         (MARAUDER_V4, MARAUDER_V4),
         (MARAUDER_V6, MARAUDER_V6),
         (FLIPPER_BFFB, FLIPPER_BFFB),

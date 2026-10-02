@@ -13,6 +13,7 @@ from apps.wardriving import SourceDevice
 CHOICES_FUNCTION_PROCESS = {
     SourceDevice.UNKNOWN: None,
     SourceDevice.MININO: process_file_minino,
+    SourceDevice.MININO_RF_VILLAGE_MX_WARDRIVER: process_file_minino,
     SourceDevice.FLIPPER_DEV_BOARD: process_file_marauder_esp32,
     SourceDevice.FLIPPER_DEV_BOARD_PRO: process_file_marauder_esp32,
     SourceDevice.MARAUDER_V4: process_file_marauder_esp32,
