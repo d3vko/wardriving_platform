@@ -188,7 +188,10 @@ services:
     image: metabase/metabase:v0.63.2.x
     env_file: .env
     environment:
-      MB_MAP_TILE_SERVER_URL: "${MB_MAP_TILE_SERVER_URL:-/map-tiles/{z}/{x}/{y}.png}"
+      # Literal braces — never use ${VAR:-.../{z}/...}; Compose closes on the
+      # first } and produces .../{x}/{y}.png} (404 + %7D in the browser).
+      # Override: set MB_MAP_TILE_SERVER_URL in .env (env_file) or change this.
+      MB_MAP_TILE_SERVER_URL: "/map-tiles/{z}/{x}/{y}.png"
     volumes:
       - metabase_data:/metabase-data
     healthcheck:
