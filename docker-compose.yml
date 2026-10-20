@@ -185,7 +185,7 @@ services:
   #   restart: on-failure
 
   wardrive_bi:
-    image: metabase/metabase:v0.63.2.x
+    image: metabase/metabase:v0.64.2
     env_file: .env
     environment:
       # Literal braces — never use ${VAR:-.../{z}/...}; Compose closes on the
