@@ -19,6 +19,7 @@ from apps.process._wigle_canonical.sanitizers import sanitize_security
 from apps.process._wigle_canonical.schema import CanonicalRow, coerce_row
 from apps.process.marauder import (
     detect_dialect,  # re-exported convenience
+    parse_log_ble,
     parse_log_ble_device_malformed,
     parse_log_classic,
     parse_log_wifi,
@@ -173,6 +174,35 @@ class ParseLogWifiTests(SimpleTestCase):
     def test_skip_empty(self):
         self.assertIsNone(parse_log_wifi(""))
 
+    def test_indexed_extended_frequency_and_rcois(self):
+        """Marauder v1.19+ wardrive_XX.log: Channel,Frequency,RSSI,...,RCOIs,MfgrId,Type."""
+        line = (
+            "1 | aa:bb:cc:dd:ee:01,CafeNet,[WPA2_PSK],2026-10-26 00:30:42,"
+            "149,5745,-83,1.2345678,-9.8765432,2240.60,3.50,,0,WIFI"
+        )
+        row = parse_log_wifi(line)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["MAC"].lower(), "aa:bb:cc:dd:ee:01")
+        self.assertEqual(row["SSID"], "CafeNet")
+        self.assertEqual(row["Channel"], "149")
+        self.assertEqual(row["Frequency"], "5745")
+        self.assertEqual(row["RSSI"], "-83")
+        self.assertEqual(row["CurrentLatitude"], "1.2345678")
+        self.assertEqual(row["CurrentLongitude"], "-9.8765432")
+        self.assertEqual(row["Type"], "WIFI")
+
+    def test_indexed_extended_does_not_steal_classic_rssi(self):
+        """Classic indexed row (no Frequency) still parses; RSSI stays RSSI."""
+        line = (
+            "2 | aa:bb:cc:dd:ee:02,CafeNet,[OPEN],2026-10-26 00:30:42,"
+            "6,-49,1.2345678,-9.8765432,66.66,5.00,WIFI"
+        )
+        row = parse_log_wifi(line)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["Channel"], "6")
+        self.assertEqual(row["RSSI"], "-49")
+        self.assertNotIn("Frequency", row)
+
 
 # ---------------------------------------------------------------------------
 # parse_log_classic and parse_log_ble_device_malformed
@@ -221,6 +251,45 @@ class ParseLogClassicAndMalformedTests(SimpleTestCase):
     def test_skip_comment(self):
         self.assertIsNone(parse_log_classic("# this is a comment"))
 
+    def test_classic_wifi_extended_frequency(self):
+        line = (
+            "aa:bb:cc:dd:ee:03,CafeNet,[WPA2_PSK],2026-10-26 00:30:42,"
+            "11,2462,-44,1.2345678,-9.8765432,66.66,5.00,,0,WIFI"
+        )
+        row = parse_log_classic(line)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["MAC"], "aa:bb:cc:dd:ee:03")
+        self.assertEqual(row["Frequency"], "2462")
+        self.assertEqual(row["RSSI"], "-44")
+        self.assertEqual(row["Type"], "WIFI")
+
+
+class ParseLogBleExtendedTests(SimpleTestCase):
+    def test_glued_duplicate_mac_extended(self):
+        line = (
+            "aa:bb:cc:dd:ee:04aa:bb:cc:dd:ee:04,,[BLE],2026-10-26 00:30:43,"
+            "0,0,-87,1.2345678,-9.8765432,2240.60,3.50,,0,BLE"
+        )
+        row = parse_log_ble(line)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["MAC"].lower(), "aa:bb:cc:dd:ee:04")
+        self.assertEqual(row["Channel"], "0")
+        self.assertEqual(row["Frequency"], "0")
+        self.assertEqual(row["RSSI"], "-87")
+        self.assertEqual(row["Type"], "BLE")
+
+    def test_name_glued_to_mac_extended(self):
+        line = (
+            "HeadphonesLE11:22:33:44:55:66,,[BLE],2026-10-26 00:30:44,"
+            "0,0,-85,1.2345678,-9.8765432,2240.50,3.00,,0,BLE"
+        )
+        row = parse_log_ble(line)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["MAC"].lower(), "11:22:33:44:55:66")
+        self.assertEqual(row["SSID"], "HeadphonesLE")
+        self.assertEqual(row["RSSI"], "-85")
+        self.assertEqual(row["Type"], "BLE")
+
 
 # ---------------------------------------------------------------------------
 # process_format_flipper_marauder_v2 (line-level processing)
@@ -266,6 +335,30 @@ class ProcessFormatV2MockTests(SimpleTestCase):
         result = process_format_flipper_marauder_v2(lines=lines, uploaded_by="t")
         self.assertIsInstance(result, tuple)
         self.assertEqual(len(result), 3)
+
+    @patch(_PATCH_BULK, return_value=(1, 0, 0))
+    def test_v2_mixed_extended_wifi_and_ble(self, mock_bulk):
+        """wardrive_XX.log mix: indexed WiFi 14-col + glued BLE 14-col."""
+        lines = [
+            "1 | aa:bb:cc:dd:ee:01,CafeNet,[WPA2_PSK],2026-10-26 00:30:42,"
+            "149,5745,-83,1.2345678,-9.8765432,2240.60,3.50,,0,WIFI\n",
+            "aa:bb:cc:dd:ee:04aa:bb:cc:dd:ee:04,,[BLE],2026-10-26 00:30:43,"
+            "0,0,-87,1.2345678,-9.8765432,2240.60,3.50,,0,BLE\n",
+            "ESP-ROM:esp32c5-eco2-20250121\n",
+            "Failed to mount SD Card\n",
+        ]
+        process_format_flipper_marauder_v2(lines=lines, uploaded_by="u")
+        mock_bulk.assert_called_once()
+        rows = mock_bulk.call_args.kwargs["rows"]
+        self.assertEqual(len(rows), 2)
+        types = {r["type"] for r in rows}
+        self.assertEqual(types, {"WIFI", "BLE"})
+        wifi = next(r for r in rows if r["type"] == "WIFI")
+        self.assertEqual(wifi["rssi"], -83)
+        self.assertEqual(wifi["channel"], 149)
+        ble = next(r for r in rows if r["type"] == "BLE")
+        self.assertEqual(ble["rssi"], -87)
+        self.assertEqual(ble["mac"], "aa:bb:cc:dd:ee:04")
 
 
 # ---------------------------------------------------------------------------

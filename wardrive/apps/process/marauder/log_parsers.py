@@ -13,8 +13,11 @@ import re
 
 from apps.core.regex import (
     LINE_RE_CLASSIC_MARAUDER,
+    LINE_RE_CLASSIC_MARAUDER_EXT,
     LINE_RE_FLIPPER_BLE,
+    LINE_RE_FLIPPER_BLE_EXT,
     LINE_RE_FLIPPER_WIFI,
+    LINE_RE_FLIPPER_WIFI_EXT,
     LINE_RE_FLIPPER_WIFI_V3,
 )
 
@@ -31,9 +34,12 @@ _SKIP_CONTAINS = (
 _RE_BLE_DEVICE_MALFORMED = re.compile(
     r"^Device:\s*(.+?),\s*(.*?),\s*\[([^\]]*)\],\s*"
     r"(\d{4}-\d{1,2}-\d{1,2} \d{2}:\d{2}:\d{2}),\s*"
-    r"(\d+),\s*(-?\d+),\s*"
+    r"(\d+),\s*(?:\d+,\s*)?"  # channel, optional frequency
+    r"(-?\d+),\s*"
     r"(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?),\s*"
-    r"(-?\d+(?:\.\d+)?),\s*(BLE|WIFI)\s*$",
+    r"(-?\d+(?:\.\d+)?)"
+    r"(?:,\s*[^,]*,\s*[^,]*)?"  # optional RCOIs,MfgrId
+    r",\s*(BLE|WIFI)\s*$",
     re.IGNORECASE,
 )
 
@@ -50,9 +56,10 @@ def _should_skip(line: str) -> bool:
 def _make_row(
     mac, ssid, auth_mode, first_seen,
     channel, rssi, lat, lon, alt, acc, data_type,
+    frequency=None,
 ) -> dict:
     """Build a raw dict keyed by standard WiGLE column names."""
-    return {
+    row = {
         "MAC": mac,
         "SSID": ssid,
         "AuthMode": auth_mode,
@@ -65,6 +72,9 @@ def _make_row(
         "AccuracyMeters": acc,
         "Type": data_type,
     }
+    if frequency is not None:
+        row["Frequency"] = frequency
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +112,11 @@ def parse_log_wifi(line: str) -> dict | None:
         return None
     s = line.strip()
 
+    m = LINE_RE_FLIPPER_WIFI_EXT.match(s)
+    if m:
+        mac, ssid, auth, ts, ch, freq, rssi, lat, lon, alt, acc, dtype = m.groups()
+        return _make_row(mac, ssid, auth, ts, ch, rssi, lat, lon, alt, acc, dtype, frequency=freq)
+
     m = LINE_RE_FLIPPER_WIFI.match(s)
     if m:
         mac, ssid, auth, ts, ch, rssi, lat, lon, alt, acc, dtype = m.groups()
@@ -118,7 +133,19 @@ def parse_log_ble(line: str) -> dict | None:
     """Parse a Marauder BLE log line (Device: prefix or bare MAC)."""
     if _should_skip(line):
         return None
-    m = LINE_RE_FLIPPER_BLE.match(line.strip())
+    s = line.strip()
+    m = LINE_RE_FLIPPER_BLE_EXT.match(s)
+    if m:
+        (
+            device_name, mac, _extra, auth_mode,
+            first_seen, channel, freq, rssi, lat, lon, alt, acc, data_type,
+        ) = m.groups()
+        ssid_or_name = (device_name or "").strip() or None
+        return _make_row(
+            mac, ssid_or_name, auth_mode, first_seen, channel, rssi, lat, lon, alt, acc, data_type,
+            frequency=freq,
+        )
+    m = LINE_RE_FLIPPER_BLE.match(s)
     if not m:
         return None
     (
@@ -137,6 +164,10 @@ def parse_log_classic(line: str) -> dict | None:
     if _should_skip(line):
         return None
     s = line.strip()
+    m = LINE_RE_CLASSIC_MARAUDER_EXT.match(s)
+    if m:
+        mac, ssid, auth, ts, ch, freq, rssi, lat, lon, alt, acc, dtype = m.groups()
+        return _make_row(mac, ssid, auth, ts, ch, rssi, lat, lon, alt, acc, dtype, frequency=freq)
     m = LINE_RE_CLASSIC_MARAUDER.match(s)
     if m:
         mac, ssid, auth, ts, ch, rssi, lat, lon, alt, acc, dtype = m.groups()
@@ -165,6 +196,7 @@ LOG_FORMAT_HEADER_MAP: dict[str, str] = {
     "security": "AuthMode",
     "first_seen": "FirstSeen",
     "channel": "Channel",
+    "frequency": "Frequency",
     "rssi": "RSSI",
     "latitude": "CurrentLatitude",
     "longitude": "CurrentLongitude",

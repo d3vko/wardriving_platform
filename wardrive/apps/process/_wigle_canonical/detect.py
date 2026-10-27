@@ -12,8 +12,11 @@ from typing import Literal
 
 from apps.core.regex import (
     LINE_RE_CLASSIC_MARAUDER,
+    LINE_RE_CLASSIC_MARAUDER_EXT,
     LINE_RE_FLIPPER_BLE,
+    LINE_RE_FLIPPER_BLE_EXT,
     LINE_RE_FLIPPER_WIFI,
+    LINE_RE_FLIPPER_WIFI_EXT,
     LINE_RE_FLIPPER_WIFI_V3,
 )
 from .aliases import HEADER_ALIASES
@@ -119,12 +122,14 @@ def detect_dialect(
         if _INDEXED_LINE_PREFIX.match(s):
             return "log_indexed"
         if (
-            LINE_RE_FLIPPER_WIFI.match(s)
+            LINE_RE_FLIPPER_WIFI_EXT.match(s)
+            or LINE_RE_FLIPPER_WIFI.match(s)
             or LINE_RE_FLIPPER_WIFI_V3.match(s)
+            or LINE_RE_FLIPPER_BLE_EXT.match(s)
             or LINE_RE_FLIPPER_BLE.match(s)
         ):
             return "log_indexed"
-        if LINE_RE_CLASSIC_MARAUDER.match(s):
+        if LINE_RE_CLASSIC_MARAUDER_EXT.match(s) or LINE_RE_CLASSIC_MARAUDER.match(s):
             return "log_classic"
         if s.startswith("Device:"):
             return "log_classic"
